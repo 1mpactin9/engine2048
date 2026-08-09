@@ -88,7 +88,7 @@ def main():
                          help="Subset of preset names to run (default: all)")
     parser.add_argument("--games", type=int, default=5, help="Games per preset")
     parser.add_argument("--seed", type=int, default=1, help="Base RNG seed")
-    parser.add_argument("--timeout", type=int, default=1800,
+    parser.add_argument("--timeout", type=int, default=900,
                          help="Per-preset timeout in seconds (games can run 500-2000+ moves each; "
                               "default is generous, lower only if you reduce --games)")
     parser.add_argument("--out", default=None, help="Write JSON results to this file")

@@ -5,7 +5,7 @@
     "cache_depth_limit": 15,
     "min_depth": 3,
     "depth_bias": 2,
-    "max_depth": 8,
+    "max_depth": 4,
     "weights": {}
   },
   "no_cache": {
@@ -14,7 +14,7 @@
     "cache_depth_limit": 15,
     "min_depth": 3,
     "depth_bias": 2,
-    "max_depth": 8,
+    "max_depth": 4,
     "no_cache": true,
     "weights": {}
   },
@@ -24,7 +24,7 @@
     "cache_depth_limit": 15,
     "min_depth": 3,
     "depth_bias": 2,
-    "max_depth": 8,
+    "max_depth": 4,
     "weights": {}
   },
   "deeper_search": {
@@ -33,7 +33,7 @@
     "cache_depth_limit": 16,
     "min_depth": 3,
     "depth_bias": 1,
-    "max_depth": 9,
+    "max_depth": 4,
     "weights": {}
   },
   "corner_15": {
@@ -42,7 +42,7 @@
     "cache_depth_limit": 15,
     "min_depth": 3,
     "depth_bias": 2,
-    "max_depth": 8,
+    "max_depth": 4,
     "weights": { "corner_weight": 15.0 }
   },
   "corner_15_huge_cache": {
@@ -51,7 +51,7 @@
     "cache_depth_limit": 15,
     "min_depth": 3,
     "depth_bias": 2,
-    "max_depth": 8,
+    "max_depth": 4,
     "weights": { "corner_weight": 15.0 }
   }
 }

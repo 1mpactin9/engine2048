@@ -7,7 +7,7 @@ const HARD_TIME_MULTIPLIER: f64 = 2.0;
 
 fn endgame_extra_depth(n: usize) -> usize {
     match n {
-        0..=4 => 10,
+        0..=4 => 30,
         5..=6 => 7,
         _ => 5,
     }

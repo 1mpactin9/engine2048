@@ -143,8 +143,9 @@ will still show natural game-to-game variance (2048's RNG is genuinely
 random), which is why multiple games per preset still matters.
 
 **Expected runtime:** games are not fixed-length; a single game commonly runs
-500-2000+ moves. At the default `max-depth 8`, most moves are fast, but the
-overall game can still take a while end to end depending on your machine.
+500-2000+ moves. At the preset `max_depth 4`, a game takes roughly 1-2 minutes
+per game on a typical machine. Deeper searches (e.g. `--max-depth 5`) grow
+roughly 10x per additional ply — a single depth-5 game can take 10+ minutes.
 Start with `--games 2-3` on a new config to gauge timing before committing to
 a full 10-20 game run.
 
