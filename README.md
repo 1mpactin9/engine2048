@@ -77,6 +77,4 @@ npm run preview
 | [Benchmark Result](docs/benchmark.md) | some example benchmark results |
 | [Developer Documentation](docs/dev.md) | throuogh project overview |
 
-note: this repository wasn't made for frontend development, the main focus is the engine, so pls ignore the bad ui quality. really wished someone pr an ui rework.
-
-this repository itself may be partially or entirely written with assistance of ai.
+If you are a rights holder and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly. 
