@@ -76,11 +76,22 @@ private:
     int search_at_depth(board_t board, Ctx& ctx) {
         int best_move_idx = -1;
         float best_score = -1.0f;
+        // Epsilon-tolerant comparison: cache hits and freshly-recomputed
+        // subtrees can produce values that are equal in principle but differ
+        // in the last few bits of float32 precision (summation order isn't
+        // identical between the two code paths). Without this tolerance,
+        // that noise can flip the outcome on a genuine tie between two moves,
+        // which showed up as cache-dependent move selection on some boards
+        // even though every individual cached value was verified correct.
+        // Using ">" (not ">=") means the first move encountered wins ties,
+        // so tie-breaking is deterministic by move order (UP, DOWN, LEFT,
+        // RIGHT) rather than by incidental float noise.
+        constexpr float TIE_EPSILON = 1e-3f;
         for (int m = 0; m < NUM_MOVES; ++m) {
             board_t nb = tables_.execute_move(m, board);
             if (nb == board) continue;
-            float s = score_tilechoose(ctx, nb, 1.0f) + 1e-6f;
-            if (s > best_score) { best_score = s; best_move_idx = m; }
+            float s = score_tilechoose(ctx, nb, 1.0f);
+            if (s > best_score + TIE_EPSILON) { best_score = s; best_move_idx = m; }
         }
         return best_move_idx;
     }

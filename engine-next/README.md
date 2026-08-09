@@ -143,9 +143,8 @@ will still show natural game-to-game variance (2048's RNG is genuinely
 random), which is why multiple games per preset still matters.
 
 **Expected runtime:** games are not fixed-length; a single game commonly runs
-500-2000+ moves. At the preset `max_depth 4`, a game takes roughly 1-2 minutes
-per game on a typical machine. Deeper searches (e.g. `--max-depth 5`) grow
-roughly 10x per additional ply — a single depth-5 game can take 10+ minutes.
+500-2000+ moves. At the default `max-depth 8`, most moves are fast, but the
+overall game can still take a while end to end depending on your machine.
 Start with `--games 2-3` on a new config to gauge timing before committing to
 a full 10-20 game run.
 
@@ -198,3 +197,55 @@ one clean run per config is far more informative than it was before. From
 there: confirm whether `corner_15` genuinely beats `baseline`, decide whether
 `huge_cache` or `deeper_search` is worth their extra runtime cost, and lock in
 a final release configuration.
+
+## Tie-breaking and the cache-vs-no-cache investigation
+
+While debugging an unrelated report, `--no-cache` and default (cached) runs
+were found to occasionally pick different moves on the *same* board even
+under the deterministic fixed-depth search. This was investigated thoroughly
+rather than dismissed, since a cache that changes decisions (not just speed)
+would be a real correctness bug. Two distinct things were found:
+
+1. **Genuine floating-point tie-breaking noise.** Two moves can have
+   expectimax values equal to within float32 precision; which one a cached
+   vs. freshly-recomputed path reports as "greater" can differ in the last
+   bit even though both represent the same true value. Fixed by widening the
+   move-selection comparison to `s > best_score + TIE_EPSILON` (1e-3) instead
+   of a bare `>`, so near-ties resolve deterministically by move order
+   instead of by incidental float noise.
+2. **A real, but small and pre-existing, cache imprecision:** the
+   transposition table key is `(board, curdepth)` only — it does not include
+   `cprob` (the cumulative spawn-probability of reaching that node), even
+   though the correctness of returning a cached value depends on `cprob`
+   too (a node's cutoff behavior is `cprob < threshold`). A value cached
+   while reached via one probability path can be reused by a different
+   search that reaches the same board+depth via a different `cprob`. Measured
+   directly across multiple seeds: cached vs. uncached search picks a
+   different move on the same board fairly often in early-game play (roughly
+   2 of 3 short game prefixes tested disagreed within the first ~10-15
+   moves), and the score gap driving those disagreements is on the order of
+   a few hundred to ~1000 points out of a ~1.6M total score (roughly
+   0.01-0.06%) — real, but small relative to the overall evaluation, and not
+   something a larger tie-break epsilon should be used to paper over, since
+   that would start masking genuinely different (non-cache-related) move
+   evaluations too. **This is not something introduced by this rewrite** —
+   nneonneo's original `2048-ai` has the identical cache-key design
+   (`std::unordered_map<board_t, ...>`, no `cprob` component), so this is a
+   long-standing characteristic of this style of engine, not a regression.
+
+Practical takeaway: `--no-cache` and cached runs can pick a different move on
+a shared board more often than you might expect — this reflects the
+`cprob`-blind cache key described above, is inherited from the reference
+design, and is not something worth chasing further without a larger redesign
+of the cache key (which would reduce the cache's hit rate and thus its
+speedup, so it's a genuine tradeoff, not a free fix). It does not undermine
+the "same seed → same game" determinism claim above, which was verified and
+holds — determinism means a given engine configuration reproduces its own
+results, not that every configuration must agree with every other one. In
+practice this means: **don't compare `--no-cache` runs against cached runs
+expecting identical play**; do compare cached runs against other cached runs
+(same or different cache size), which is what the benchmark presets actually
+do, aside from the `no_cache` preset itself, which exists specifically to
+measure the cache's *speed* contribution, not to validate move-for-move
+agreement.
+
