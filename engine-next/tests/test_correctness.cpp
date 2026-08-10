@@ -61,12 +61,27 @@ static void test_move_noop_detection() {
 static void test_cache_respects_depth() {
     TranspositionTable tt(1 << 10);
     board_t key = 0xABCDEF0123456789ULL;
-    tt.store(key, 5, 42.0f);
+    tt.store(key, 5, 10, 42.0f);
 
     float out;
-    CHECK(tt.lookup(key, 5, out) && out == 42.0f, "cache hit at exact recorded depth");
-    CHECK(tt.lookup(key, 10, out) && out == 42.0f, "cache hit when query depth is looser (>= recorded)");
-    CHECK(!tt.lookup(key, 2, out), "cache miss when query requires stricter (shallower) depth than recorded");
+    CHECK(tt.lookup(key, 5, 10, out) && out == 42.0f, "cache hit at exact recorded depth and cprob bucket");
+    CHECK(tt.lookup(key, 10, 10, out) && out == 42.0f, "cache hit when query depth is looser (>= recorded)");
+    CHECK(!tt.lookup(key, 2, 10, out), "cache miss when query requires stricter (shallower) depth than recorded");
+    CHECK(tt.lookup(key, 5, 3, out) && out == 42.0f,
+          "cache hit when query cprob bucket is smaller than recorded (stored value did at least as much work)");
+    CHECK(!tt.lookup(key, 5, 20, out),
+          "cache miss when query cprob bucket is larger than recorded (stored value may have bailed out early and done less work)");
+}
+
+static void test_cprob_bucket_monotonic() {
+    float thresh = 0.0001f;
+    int b_high = TranspositionTable::cprob_to_bucket(0.5f, thresh);
+    int b_mid = TranspositionTable::cprob_to_bucket(0.001f, thresh);
+    int b_low = TranspositionTable::cprob_to_bucket(0.00011f, thresh);
+    int b_at_thresh = TranspositionTable::cprob_to_bucket(0.0001f, thresh);
+    CHECK(b_high > b_mid && b_mid > b_low && b_low >= b_at_thresh,
+          "cprob_to_bucket is monotonically non-decreasing as cprob increases");
+    CHECK(b_at_thresh == 0, "cprob at or below threshold maps to bucket 0");
 }
 
 static void test_engine_produces_legal_move() {
@@ -130,6 +145,7 @@ int main() {
     test_moves_basic();
     test_move_noop_detection();
     test_cache_respects_depth();
+    test_cprob_bucket_monotonic();
     test_determinism();
     test_engine_produces_legal_move();
     test_engine_terminal_board();

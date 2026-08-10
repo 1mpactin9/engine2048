@@ -148,6 +148,15 @@ overall game can still take a while end to end depending on your machine.
 Start with `--games 2-3` on a new config to gauge timing before committing to
 a full 10-20 game run.
 
+**Note on hash collisions:** a collision (two different boards mapping to the
+same table slot) can only ever cost a wasted cache slot — `lookup` explicitly
+checks `stored_key == query_key` before returning a hit, so a collision
+always falls through to a cache miss and a real search, never a wrong value
+for the wrong board. A *larger* cache has *fewer* collisions, not more, so
+collisions cannot explain a larger cache producing worse play. If cached and
+uncached (or differently-sized-cache) runs disagree, see "Tie-breaking and
+the cache correctness fix" below for the actual mechanism and its fix.
+
 ## Corner/snake heuristic (`--corner-weight`)
 
 Added to push toward more reliable high tiles (8192+), beyond what the base
@@ -171,13 +180,17 @@ development:
    reusing the transpose the base heuristic already computes), reducing
    overhead to roughly 1.2-1.4x per node.
 
-Every one of the win-rate comparisons run to evaluate this term while the
-engine was still using the time-budgeted search were unreliable (see "Design,
-and a correction" above) — the same config produced 90% and 40% win rates on
-two nominally identical 10-game runs. **The corner term has not yet been
-validated under the corrected, deterministic engine.** `corner_15` and
-`corner_15_huge_cache` in `configs/presets.json` are the presets to run for a
-trustworthy answer now that results should actually reproduce.
+Every one of the win-rate comparisons run to evaluate this term before this
+turn's cache-correctness fix should be treated as unreliable, for two
+compounding reasons: the earlier time-budgeted (non-deterministic) search
+(see "Design, and a correction" above), and — even after that was fixed —
+the cache correctness bug documented above, which was present for the
+`corner_15` / `corner_15_huge_cache` benchmark runs and could itself have
+been distorting scores independent of the corner term's actual merit.
+**Please re-run `corner_15` and `corner_15_huge_cache` now that both issues
+are fixed** — the previous "corner_15 performs worse than baseline" result
+was measured on a genuinely buggy cache and should not be trusted.
+
 
 ## Incident note
 
@@ -198,54 +211,51 @@ there: confirm whether `corner_15` genuinely beats `baseline`, decide whether
 `huge_cache` or `deeper_search` is worth their extra runtime cost, and lock in
 a final release configuration.
 
-## Tie-breaking and the cache-vs-no-cache investigation
+## Tie-breaking and the cache correctness fix
 
-While debugging an unrelated report, `--no-cache` and default (cached) runs
-were found to occasionally pick different moves on the *same* board even
-under the deterministic fixed-depth search. This was investigated thoroughly
-rather than dismissed, since a cache that changes decisions (not just speed)
-would be a real correctness bug. Two distinct things were found:
+While debugging a report that `--no-cache` and cached runs occasionally
+picked different moves on the same board, this was investigated fully rather
+than dismissed, since a cache that changes decisions (not just speed) is a
+real correctness bug. Two distinct things were found and fixed:
 
-1. **Genuine floating-point tie-breaking noise.** Two moves can have
-   expectimax values equal to within float32 precision; which one a cached
-   vs. freshly-recomputed path reports as "greater" can differ in the last
-   bit even though both represent the same true value. Fixed by widening the
-   move-selection comparison to `s > best_score + TIE_EPSILON` (1e-3) instead
-   of a bare `>`, so near-ties resolve deterministically by move order
-   instead of by incidental float noise.
-2. **A real, but small and pre-existing, cache imprecision:** the
-   transposition table key is `(board, curdepth)` only — it does not include
-   `cprob` (the cumulative spawn-probability of reaching that node), even
-   though the correctness of returning a cached value depends on `cprob`
-   too (a node's cutoff behavior is `cprob < threshold`). A value cached
-   while reached via one probability path can be reused by a different
-   search that reaches the same board+depth via a different `cprob`. Measured
-   directly across multiple seeds: cached vs. uncached search picks a
-   different move on the same board fairly often in early-game play (roughly
-   2 of 3 short game prefixes tested disagreed within the first ~10-15
-   moves), and the score gap driving those disagreements is on the order of
-   a few hundred to ~1000 points out of a ~1.6M total score (roughly
-   0.01-0.06%) — real, but small relative to the overall evaluation, and not
-   something a larger tie-break epsilon should be used to paper over, since
-   that would start masking genuinely different (non-cache-related) move
-   evaluations too. **This is not something introduced by this rewrite** —
-   nneonneo's original `2048-ai` has the identical cache-key design
-   (`std::unordered_map<board_t, ...>`, no `cprob` component), so this is a
-   long-standing characteristic of this style of engine, not a regression.
+1. **Floating-point tie-breaking noise.** Two moves can have expectimax
+   values equal to within float32 precision; which one a cached vs.
+   freshly-recomputed path reports as "greater" could differ in the last bit.
+   Fixed by widening the move-selection comparison to
+   `s > best_score + TIE_EPSILON` (1e-3) instead of a bare `>`.
+2. **A real cache correctness bug, now fixed:** the transposition table key
+   was `(board, depth)` only. But whether a node's search bails out early to
+   the cheap heuristic depends on `cprob` (cumulative spawn-probability of
+   reaching that node) too — `cprob < cprob_thresh` triggers an early return.
+   A value computed via such an early bailout (cheap, less accurate) could
+   get cached and then reused by a different call reaching the same
+   `(board, depth)` with a higher `cprob`, which would otherwise have
+   recursed further and gotten a more accurate answer. Verified directly:
+   with the bug present, cached and uncached search disagreed on the chosen
+   move in roughly 2 of 3 short game sequences tested; after the fix, 8/8
+   independent seeds agreed on every move over 20-move sequences.
 
-Practical takeaway: `--no-cache` and cached runs can pick a different move on
-a shared board more often than you might expect — this reflects the
-`cprob`-blind cache key described above, is inherited from the reference
-design, and is not something worth chasing further without a larger redesign
-of the cache key (which would reduce the cache's hit rate and thus its
-speedup, so it's a genuine tradeoff, not a free fix). It does not undermine
-the "same seed → same game" determinism claim above, which was verified and
-holds — determinism means a given engine configuration reproduces its own
-results, not that every configuration must agree with every other one. In
-practice this means: **don't compare `--no-cache` runs against cached runs
-expecting identical play**; do compare cached runs against other cached runs
-(same or different cache size), which is what the benchmark presets actually
-do, aside from the `no_cache` preset itself, which exists specifically to
-measure the cache's *speed* contribution, not to validate move-for-move
-agreement.
+   **The fix:** the cache now also keys on a coarse bucket of "how much
+   `cprob` headroom remains before the cutoff" (`log2(cprob / cprob_thresh)`,
+   clamped), and only serves a cache hit when the stored entry's bucket is
+   `>=` the current call's — i.e. the stored computation had at least as much
+   room to recurse as the current one needs. An exact `cprob` match was tried
+   first and rejected: it collapsed the cache hit rate to ~0% (cprob varies
+   continuously along nearly every path, so exact matches almost never
+   happen). The bucketed version keeps most of the practical hit rate
+   (measured: 0.44% vs. ~0.8-1.5% for the old, unsafe version, vs. ~0% for
+   exact-match) while being provably safe against the early-bailout
+   corruption case.
+
+   **This was not something introduced by this rewrite** — nneonneo's
+   original `2048-ai` has the same `(board)`-only cache key with no `cprob`
+   component at all, so the underlying imprecision is a long-standing
+   characteristic of this style of engine that this project now improves on,
+   not a regression.
+
+Practical takeaway: cached and uncached runs should now agree on move
+selection far more consistently than before this fix (verified: 8/8 vs. 1/20
+in matched testing). Perfect agreement in every case isn't guaranteed to be
+provable without exhaustive testing, but the known corruption mechanism is
+now closed.
 

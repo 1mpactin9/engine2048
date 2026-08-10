@@ -104,7 +104,8 @@ private:
 
         if (cfg_.use_cache && ctx.curdepth < cfg_.cache_depth_limit) {
             float cached;
-            if (tt_.lookup(board, ctx.curdepth, cached)) {
+            int bucket = TranspositionTable::cprob_to_bucket(cprob, cfg_.cprob_thresh);
+            if (tt_.lookup(board, ctx.curdepth, bucket, cached)) {
                 ctx.cache_hits++;
                 return cached;
             }
@@ -127,7 +128,8 @@ private:
         res /= num_open;
 
         if (cfg_.use_cache && ctx.curdepth < cfg_.cache_depth_limit) {
-            tt_.store(board, uint8_t(ctx.curdepth), res);
+            int bucket = TranspositionTable::cprob_to_bucket(cprob, cfg_.cprob_thresh);
+            tt_.store(board, uint8_t(ctx.curdepth), bucket, res);
         }
         return res;
     }
