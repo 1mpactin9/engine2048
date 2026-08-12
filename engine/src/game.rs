@@ -2,7 +2,7 @@ use rand::Rng;
 use std::collections::VecDeque;
 use std::fmt;
 use crate::board as bitboard_mod;
-use crate::EvalMode;
+use crate::{EvalMode, EvalConfig};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
@@ -155,8 +155,19 @@ impl Engine {
         self.won
     }
 
-    pub(crate) fn set_grid(&mut self, grid: Vec<Vec<u32>>) {
+    pub fn set_grid(&mut self, grid: Vec<Vec<u32>>) {
         self.grid = grid;
+    }
+
+    pub fn evaluate_position(&self, mode: EvalMode) -> crate::eval::EvalResult {
+        let config = mode.config();
+        self.evaluate_position_with_config(&config)
+    }
+
+    pub fn evaluate_position_with_config(&self, config: &EvalConfig) -> crate::eval::EvalResult {
+        let board = Self::flatten(self.grid());
+        let n = self.size;
+        crate::eval::compute_eval_result(&board, n, config)
     }
 
     pub fn tile_at(&self, r: usize, c: usize) -> Result<u32, EngineError> {
@@ -433,7 +444,7 @@ impl Engine {
                 continue;
             }
 
-            let result = Self::evaluate_board(&new_board, n, &config);
+            let result = crate::eval::compute_eval_result(&new_board, n, &config);
             if result.score > best_score {
                 best_score = result.score;
                 best_dir = Some(dir);
