@@ -40,11 +40,47 @@ impl Default for EvalConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct EvalResult {
-    pub score: f64,
-    pub components: [f64; 8],
-    pub depth_reached: usize,
-    pub nodes_evaluated: u64,
+pub struct EvalStats {
+    pub evaluations: u64,
+    pub total_time_ns: u128,
+    pub avg_score: f64,
+    pub best_score: f64,
+    pub worst_score: f64,
+}
+
+impl Default for EvalStats {
+    fn default() -> Self {
+        EvalStats {
+            evaluations: 0,
+            total_time_ns: 0,
+            avg_score: 0.0,
+            best_score: f64::NEG_INFINITY,
+            worst_score: f64::INFINITY,
+        }
+    }
+}
+
+impl EvalStats {
+    pub fn record(&mut self, score: f64, time_ns: u128) {
+        self.evaluations += 1;
+        self.total_time_ns += time_ns;
+        self.avg_score = (self.avg_score * (self.evaluations as f64 - 1.0) + score)
+            / self.evaluations as f64;
+        if score > self.best_score {
+            self.best_score = score;
+        }
+        if score < self.worst_score {
+            self.worst_score = score;
+        }
+    }
+
+    pub fn avg_time_ns(&self) -> f64 {
+        if self.evaluations == 0 {
+            0.0
+        } else {
+            self.total_time_ns as f64 / self.evaluations as f64
+        }
+    }
 }
 
 impl EvalResult {
