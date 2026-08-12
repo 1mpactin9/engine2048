@@ -142,8 +142,8 @@ pub fn compute_eval_result(board: &[u32], n: usize, config: &EvalConfig) -> Eval
     }
 
     let hash = compute_board_hash(board, n);
-    if let Some(cached) = EVAL_CACHE.lock().unwrap().get(&hash) {
-        return cached.clone();
+    if let Some(cached) = EVAL_CACHE.with(|cache| cache.borrow().get(&hash).cloned()) {
+        return cached;
     }
 
     let components = compute_eval_components(board, n);
@@ -156,7 +156,9 @@ pub fn compute_eval_result(board: &[u32], n: usize, config: &EvalConfig) -> Eval
         1,
     );
 
-    EVAL_CACHE.lock().unwrap().insert(hash, result.clone());
+    EVAL_CACHE.with(|cache| {
+        cache.borrow_mut().insert(hash, result.clone());
+    });
     result
 }
 
