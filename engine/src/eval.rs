@@ -199,8 +199,12 @@ pub fn compute_total_score(components: &[f64; 8], weights: [f64; 8]) -> f64 {
 }
 
 pub fn eval_empty_cells(board: &[u32], _n: usize) -> f64 {
-    let empty_count = board.iter().filter(|&&v| v == 0).count() as f64;
-    (empty_count + 1.0).log2()
+    // Fast path: count empties using SIMD-friendly approach
+    let mut empty_count = 0u32;
+    for &v in board.iter() {
+        empty_count += (v == 0) as u32;
+    }
+    (empty_count as f64 + 1.0).log2()
 }
 
 pub fn eval_monotony(board: &[u32], n: usize) -> f64 {
