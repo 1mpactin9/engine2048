@@ -176,8 +176,8 @@ pub fn eval_cache_size() -> usize {
 }
 
 fn compute_board_hash(board: &[u32], n: usize) -> u64 {
+    use std::hash::{Hash, Hasher};
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    use std::hash::Hash;
     board[..n * n].hash(&mut hasher);
     n.hash(&mut hasher);
     hasher.finish()
@@ -574,7 +574,7 @@ mod tests {
 
     #[test]
     fn max_tile_evaluation() {
-        let board = vec![0u32; 16];
+        let mut board = vec![0u32; 16];
         board[0] = 4096;
         let eval = eval_max_tile(&board, 4);
         assert_eq!(eval, 4096.0);
