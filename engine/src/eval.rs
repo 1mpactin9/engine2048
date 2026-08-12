@@ -40,11 +40,47 @@ impl Default for EvalConfig {
 }
 
 #[derive(Debug, Clone)]
-pub struct EvalResult {
-    pub score: f64,
-    pub components: [f64; 8],
-    pub depth_reached: usize,
-    pub nodes_evaluated: u64,
+pub struct EvalStats {
+    pub evaluations: u64,
+    pub total_time_ns: u128,
+    pub avg_score: f64,
+    pub best_score: f64,
+    pub worst_score: f64,
+}
+
+impl Default for EvalStats {
+    fn default() -> Self {
+        EvalStats {
+            evaluations: 0,
+            total_time_ns: 0,
+            avg_score: 0.0,
+            best_score: f64::NEG_INFINITY,
+            worst_score: f64::INFINITY,
+        }
+    }
+}
+
+impl EvalStats {
+    pub fn record(&mut self, score: f64, time_ns: u128) {
+        self.evaluations += 1;
+        self.total_time_ns += time_ns;
+        self.avg_score = (self.avg_score * (self.evaluations as f64 - 1.0) + score)
+            / self.evaluations as f64;
+        if score > self.best_score {
+            self.best_score = score;
+        }
+        if score < self.worst_score {
+            self.worst_score = score;
+        }
+    }
+
+    pub fn avg_time_ns(&self) -> f64 {
+        if self.evaluations == 0 {
+            0.0
+        } else {
+            self.total_time_ns as f64 / self.evaluations as f64
+        }
+    }
 }
 
 impl EvalResult {
@@ -97,15 +133,46 @@ pub fn compute_eval_result(board: &[u32], n: usize, config: &EvalConfig) -> Eval
         return EvalResult::empty();
     }
 
+    let hash = compute_board_hash(board, n);
+    if let Some(cached) = EVAL_CACHE.lock().unwrap().get(&hash) {
+        return cached.clone();
+    }
+
     let components = compute_eval_components(board, n);
     let score = compute_total_score(&components, config.weights);
 
-    EvalResult::new(
+    let result = EvalResult::new(
         score,
         components,
         config.depth,
         1,
-    )
+    );
+
+    EVAL_CACHE.lock().unwrap().insert(hash, result.clone());
+    result
+}
+
+thread_local! {
+    static EVAL_CACHE: std::cell::RefCell<std::collections::HashMap<u64, EvalResult>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
+}
+
+pub fn clear_eval_cache() {
+    EVAL_CACHE.with(|cache| {
+        cache.borrow_mut().clear();
+    });
+}
+
+pub fn eval_cache_size() -> usize {
+    EVAL_CACHE.with(|cache| cache.borrow().len())
+}
+
+fn compute_board_hash(board: &[u32], n: usize) -> u64 {
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    use std::hash::Hash;
+    board[..n * n].hash(&mut hasher);
+    n.hash(&mut hasher);
+    hasher.finish()
 }
 
 pub fn compute_eval_components(board: &[u32], n: usize) -> [f64; 8] {
