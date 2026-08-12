@@ -33,7 +33,7 @@ SUMMARY_RE = re.compile(
 
 
 def build_command(preset_name, preset, games, seed):
-    cmd = [str(BINARY), "--games", str(games), "--seed", str(seed)]
+    cmd = [str(BINARY.absolute()), "--games", str(games), "--seed", str(seed)]
     cmd += ["--tt-bits", str(preset.get("tt_bits", 22))]
     cmd += ["--cache-depth-limit", str(preset.get("cache_depth_limit", 15))]
     cmd += ["--min-depth", str(preset.get("min_depth", 3))]
@@ -55,7 +55,7 @@ def run_preset(preset_name, preset, games, seed, timeout):
 
     start = time.time()
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=True)
     except subprocess.TimeoutExpired:
         print(f"  TIMEOUT after {timeout}s — reduce --games or lower this preset's max_depth")
         return {"preset": preset_name, "error": "timeout"}
@@ -88,9 +88,9 @@ def main():
                          help="Subset of preset names to run (default: all)")
     parser.add_argument("--games", type=int, default=5, help="Games per preset")
     parser.add_argument("--seed", type=int, default=1, help="Base RNG seed")
-    parser.add_argument("--timeout", type=int, default=1800,
+    parser.add_argument("--timeout", type=int, default=7200,
                          help="Per-preset timeout in seconds (games can run 500-2000+ moves each; "
-                              "default is generous, lower only if you reduce --games)")
+                              "default is 2h, lower only if you reduce --games)")
     parser.add_argument("--out", default=None, help="Write JSON results to this file")
     args = parser.parse_args()
 

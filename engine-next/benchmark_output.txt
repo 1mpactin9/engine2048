@@ -1,0 +1,43 @@
+
+=== baseline ===
+  nneonneo's exact proven settings: depth = max(3, distinct-2), cache 2^22 entries
+  cmd: D:\personal\Projects\operational\client\2048\engine-next\engine2048.exe --games 8 --seed 1 --tt-bits 22 --cache-depth-limit 15 --min-depth 3 --depth-bias 2 --max-depth 8
+  ERROR (exit 1): 
+
+=== no_cache ===
+  Cache disabled entirely; isolates how much the transposition table helps at fixed depth
+  cmd: D:\personal\Projects\operational\client\2048\engine-next\engine2048.exe --games 8 --seed 1 --tt-bits 22 --cache-depth-limit 15 --min-depth 3 --depth-bias 2 --max-depth 8 --no-cache
+  ERROR (exit 1): 
+
+=== huge_cache ===
+  Same fixed-depth search as baseline, much larger cache (2^26 entries, ~1GB) to isolate cache-size effect alone
+  cmd: D:\personal\Projects\operational\client\2048\engine-next\engine2048.exe --games 8 --seed 1 --tt-bits 26 --cache-depth-limit 15 --min-depth 3 --depth-bias 2 --max-depth 8
+  ERROR (exit 1): 
+
+=== deeper_search ===
+  depth_bias=1 instead of 2: searches one ply deeper at every tile count than nneonneo's original
+  cmd: D:\personal\Projects\operational\client\2048\engine-next\engine2048.exe --games 8 --seed 1 --tt-bits 24 --cache-depth-limit 16 --min-depth 3 --depth-bias 1 --max-depth 9
+  ERROR (exit 1): 
+
+=== corner_15 ===
+  baseline + snake/corner heuristic term, weight=15 (best candidate from prior noisy testing, re-tested now that search is deterministic)
+  cmd: D:\personal\Projects\operational\client\2048\engine-next\engine2048.exe --games 8 --seed 1 --tt-bits 22 --cache-depth-limit 15 --min-depth 3 --depth-bias 2 --max-depth 8 --corner-weight 15.0
+  ERROR (exit 1): 
+
+=== corner_15_huge_cache ===
+  corner_15 combined with the huge cache, if both individually help this tests whether they stack
+  cmd: D:\personal\Projects\operational\client\2048\engine-next\engine2048.exe --games 8 --seed 1 --tt-bits 26 --cache-depth-limit 15 --min-depth 3 --depth-bias 2 --max-depth 8 --corner-weight 15.0
+  ERROR (exit 1): 
+
+
+=== Comparison table ===
+preset                     avg_score  avg_tile    win%  s/move avg    hit%    wall_s
+------------------------------------------------------------------------------------
+baseline                ERROR: nonzero_exit
+no_cache                ERROR: nonzero_exit
+huge_cache              ERROR: nonzero_exit
+deeper_search           ERROR: nonzero_exit
+corner_15               ERROR: nonzero_exit
+corner_15_huge_cache    ERROR: nonzero_exit
+
+Wrote results to results.json
