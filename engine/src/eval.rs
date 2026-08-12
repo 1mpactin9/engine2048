@@ -107,6 +107,7 @@ impl EvalResult {
             components: [0.0; 8],
             depth_reached: 0,
             nodes_evaluated: 0,
+        }
     }
 }
 
