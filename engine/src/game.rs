@@ -433,7 +433,7 @@ impl Engine {
                 continue;
             }
 
-            let result = Self::evaluate_board(&new_board, n, &config);
+            let result = crate::eval::compute_eval_result(&new_board, n, &config);
             if result.score > best_score {
                 best_score = result.score;
                 best_dir = Some(dir);

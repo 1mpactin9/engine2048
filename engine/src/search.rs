@@ -29,7 +29,7 @@ pub(crate) fn now_ms() -> f64 {
 
 use crate::board as bitboard_mod;
 use crate::transposition::{tt_get, tt_put, zobrist_hash};
-use crate::{Action, Direction, Engine, UsageMode};
+use crate::{Action, Direction, Engine, UsageMode, EvalMode, EvalConfig};
 
 use std::cell::Cell;
 
@@ -196,6 +196,37 @@ impl Engine {
             depth += 1;
         }
         (best_dir, best_val)
+    }
+
+    pub fn suggest_move_with_eval_mode(grid: &Vec<Vec<u32>>, mode: EvalMode) -> Option<Direction> {
+        Self::suggest_move_with_eval_for(grid, None, mode)
+    }
+
+    pub fn suggest_move_with_eval_config(grid: &Vec<Vec<u32>>, config: &EvalConfig) -> Option<Direction> {
+        let n = grid.len();
+        let board = Self::flatten(grid);
+
+        let mut best_dir = None;
+        let mut best_score = f64::NEG_INFINITY;
+
+        for &dir in Direction::ALL.iter() {
+            let (mut new_board, _) = Self::slide_flat(&board, n, dir);
+            if new_board == board {
+                continue;
+            }
+
+            let result = Self::compute_eval_result(&new_board, n, config);
+            if result.score > best_score {
+                best_score = result.score;
+                best_dir = Some(dir);
+            }
+        }
+
+        best_dir
+    }
+
+    pub fn compute_eval_result(board: &[u32], n: usize, config: &EvalConfig) -> crate::eval::EvalResult {
+        crate::eval::compute_eval_result(board, n, config)
     }
 
     pub fn suggest_action_for(
