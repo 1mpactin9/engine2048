@@ -155,7 +155,7 @@ impl Engine {
         self.won
     }
 
-    pub(crate) fn set_grid(&mut self, grid: Vec<Vec<u32>>) {
+    pub fn set_grid(&mut self, grid: Vec<Vec<u32>>) {
         self.grid = grid;
     }
 

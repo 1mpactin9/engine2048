@@ -210,7 +210,7 @@ impl Engine {
         let mut best_score = f64::NEG_INFINITY;
 
         for &dir in Direction::ALL.iter() {
-            let (mut new_board, _) = Self::slide_flat(&board, n, dir);
+            let (new_board, _) = Self::slide_flat(&board, n, dir);
             if new_board == board {
                 continue;
             }
