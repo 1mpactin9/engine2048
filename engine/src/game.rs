@@ -2,7 +2,7 @@ use rand::Rng;
 use std::collections::VecDeque;
 use std::fmt;
 use crate::board as bitboard_mod;
-use crate::EvalMode;
+use crate::{EvalMode, EvalConfig};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {

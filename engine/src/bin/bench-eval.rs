@@ -29,7 +29,7 @@ fn benchmark_eval() {
 
         for &mode in MODES {
             let config = mode.config();
-            let mut total_time_ns = 0u64;
+            let mut total_time_ns = 0u128;
 
             for i in 0..TEST_POSITIONS {
                 let board = generate_test_board(n, i as u64);
@@ -133,7 +133,7 @@ fn find_optimal_weights() {
 
         let mut total_score = 0.0;
         for board in &test_boards {
-            let engine = Engine::with_size(4).unwrap();
+            let mut engine = Engine::with_size(4).unwrap();
             engine.set_grid(board.clone());
             let result = engine.evaluate_position_with_config(&config);
             total_score += result.score;
