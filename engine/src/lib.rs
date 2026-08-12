@@ -14,7 +14,7 @@ mod wasm;
 pub use game::{Action, Config, Direction, Engine, EngineError, MoveOutcome};
 pub use usage::UsageMode;
 pub use deterministic::SeedRng;
-pub use eval::{EvalConfig, EvalMode, EvalResult};
+pub use eval::{EvalConfig, EvalMode, EvalResult, eval_cache_size, clear_eval_cache};
 pub use eval_tracker::EvalTracker;
 
 #[cfg(test)]
