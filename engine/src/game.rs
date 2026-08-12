@@ -2,6 +2,7 @@ use rand::Rng;
 use std::collections::VecDeque;
 use std::fmt;
 use crate::board as bitboard_mod;
+use crate::EvalMode;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
@@ -404,6 +405,42 @@ impl Engine {
         usage: crate::UsageMode,
     ) -> Option<Direction> {
         Self::suggest_move_det_guarantee(&self.grid, key, calls, manipulate, usage)
+    }
+
+    pub fn suggest_move_with_eval(
+        &self,
+        depth: Option<usize>,
+        mode: EvalMode,
+    ) -> Option<Direction> {
+        Self::suggest_move_with_eval_for(&self.grid, depth, mode)
+    }
+
+    pub fn suggest_move_with_eval_for(
+        grid: &Vec<Vec<u32>>,
+        _depth: Option<usize>,
+        mode: EvalMode,
+    ) -> Option<Direction> {
+        let config = mode.config();
+        let board = Self::flatten(grid);
+        let n = grid.len();
+
+        let mut best_dir = None;
+        let mut best_score = f64::NEG_INFINITY;
+
+        for &dir in Direction::ALL.iter() {
+            let (new_board, _) = Self::slide_flat(&board, n, dir);
+            if new_board == board {
+                continue;
+            }
+
+            let result = Self::evaluate_board(&new_board, n, &config);
+            if result.score > best_score {
+                best_score = result.score;
+                best_dir = Some(dir);
+            }
+        }
+
+        best_dir
     }
     pub(crate) fn flatten(grid: &Vec<Vec<u32>>) -> Vec<u32> {
         let n = grid.len();

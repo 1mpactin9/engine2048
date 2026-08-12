@@ -145,7 +145,7 @@ impl Engine {
         total
     }
 
-    pub fn eval_empty_cells(board: &[u32], n: usize) -> f64 {
+    pub fn eval_empty_cells(board: &[u32], _n: usize) -> f64 {
         let empty_count = board.iter().filter(|&&v| v == 0).count() as f64;
         (empty_count + 1.0).log2()
     }
@@ -346,7 +346,7 @@ impl Engine {
         }
 
         board.iter().copied().fold(0.0, |max, v| {
-            if v > max {
+            if v as f64 > max {
                 v as f64
             } else {
                 max
@@ -372,7 +372,7 @@ impl Engine {
         let mut distribution = 0.0;
         for (i, &count) in tile_counts.iter().enumerate() {
             if count > 0 {
-                distribution += (count as f64).log1p() * (i as f64).sqrt();
+                distribution += (count as f64).log10() * (i as f64).sqrt();
             }
         }
 

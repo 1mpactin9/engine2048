@@ -5,6 +5,7 @@ mod heuristic;
 mod transposition;
 mod deterministic;
 mod usage;
+mod eval;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm;
@@ -12,6 +13,7 @@ mod wasm;
 pub use game::{Action, Config, Direction, Engine, EngineError, MoveOutcome};
 pub use usage::UsageMode;
 pub use deterministic::SeedRng;
+pub use eval::{EvalConfig, EvalMode, EvalResult};
 
 #[cfg(test)]
 mod tests {
