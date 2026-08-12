@@ -83,6 +83,34 @@ impl EvalStats {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct EvalResult {
+    pub score: f64,
+    pub components: [f64; 8],
+    pub depth_reached: usize,
+    pub nodes_evaluated: u64,
+}
+
+impl EvalResult {
+    pub fn new(score: f64, components: [f64; 8], depth: usize, nodes: u64) -> Self {
+        EvalResult {
+            score,
+            components,
+            depth_reached: depth,
+            nodes_evaluated: nodes,
+        }
+    }
+
+    pub fn empty() -> Self {
+        EvalResult {
+            score: 0.0,
+            components: [0.0; 8],
+            depth_reached: 0,
+            nodes_evaluated: 0,
+        }
+    }
+}
+
 impl EvalResult {
     pub fn new(score: f64, components: [f64; 8], depth: usize, nodes: u64) -> Self {
         EvalResult {
