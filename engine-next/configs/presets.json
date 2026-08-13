@@ -9,7 +9,7 @@
     "weights": {}
   },
   "no_cache": {
-    "description": "Cache disabled entirely; isolates how much the transposition table helps at fixed depth",
+    "description": "Cache disabled entirely; isolates how much the transposition table helps. Uses max_depth=6 (not the default 8) because uncached search at depth 8 is prohibitively slow -- this preset exists to measure the cache's speed contribution, not to be a fast/strong config in its own right.",
     "tt_bits": 22,
     "cache_depth_limit": 15,
     "min_depth": 3,
