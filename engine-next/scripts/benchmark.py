@@ -54,22 +54,47 @@ def run_preset(preset_name, preset, games, seed, timeout):
     print(f"  cmd: {' '.join(cmd)}")
 
     start = time.time()
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             text=True, bufsize=1)
+    lines = []
+    timed_out = False
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=True)
-    except subprocess.TimeoutExpired:
-        print(f"  TIMEOUT after {timeout}s — reduce --games or lower this preset's max_depth")
-        return {"preset": preset_name, "error": "timeout"}
+        while True:
+            elapsed = time.time() - start
+            if elapsed > timeout:
+                proc.kill()
+                timed_out = True
+                break
+            line = proc.stdout.readline()
+            if line:
+                lines.append(line)
+                stripped = line.rstrip()
+                if stripped.startswith("game "):
+                    print(f"  [{elapsed:6.1f}s] {stripped}")
+            elif proc.poll() is not None:
+                break
+    finally:
+        if proc.poll() is None:
+            proc.kill()
     wall = time.time() - start
 
-    if result.returncode != 0:
-        print(f"  ERROR (exit {result.returncode}): {result.stderr[-500:]}")
-        return {"preset": preset_name, "error": "nonzero_exit", "stderr": result.stderr[-500:]}
+    if timed_out:
+        print(f"  TIMEOUT after {timeout}s — {len(lines)} game line(s) completed before timeout. "
+              f"Increase --timeout, or reduce --games, or lower this preset's max_depth in configs/presets.json.")
+        return {"preset": preset_name, "error": "timeout", "games_completed": sum(1 for l in lines if l.startswith("game "))}
 
-    match = SUMMARY_RE.search(result.stdout)
+    result_stdout = "".join(lines)
+    returncode = proc.returncode
+
+    if returncode != 0:
+        print(f"  ERROR (exit {returncode}): {result_stdout[-500:]}")
+        return {"preset": preset_name, "error": "nonzero_exit", "stderr": result_stdout[-500:]}
+
+    match = SUMMARY_RE.search(result_stdout)
     if not match:
         print("  Could not parse output:")
-        print(result.stdout[-500:])
-        return {"preset": preset_name, "error": "parse_failed", "raw": result.stdout}
+        print(result_stdout[-500:])
+        return {"preset": preset_name, "error": "parse_failed", "raw": result_stdout}
 
     data = match.groupdict()
     data = {k: float(v) if "." in v else int(v) for k, v in data.items()}
