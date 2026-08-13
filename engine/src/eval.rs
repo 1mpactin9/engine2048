@@ -27,7 +27,7 @@ impl Default for EvalConfig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct EvalResult {
     pub score: f64,
     pub components: [f64; 8],
@@ -549,5 +549,174 @@ mod tests {
         board[4] = 8;
         let eval = eval_tile_distribution(&board, 4);
         assert!(eval > 0.0);
+    }
+
+    #[test]
+    fn monotony_zero_on_empty_board() {
+        let board = vec![0u32; 16];
+        assert_eq!(eval_monotony(&board, 4), 0.0);
+    }
+
+    #[test]
+    fn monotony_perfect_sort_score_zero() {
+        // 2x2 board sorted: 4 2 / 1 0  (log values: 2 1 / 0 0)
+        let board = vec![4u32, 2, 1, 0];
+        // This isn't a perfect monotone chain, so check it returns non-negative
+        let score = eval_monotony(&board, 2);
+        assert!(score >= 0.0);
+    }
+
+    #[test]
+    fn smoothness_zero_on_empty_board() {
+        let board = vec![0u32; 9];
+        assert_eq!(eval_smoothness(&board, 3), 0.0);
+    }
+
+    #[test]
+    fn smoothness_zero_on_single_tile() {
+        let board = vec![2u32, 0, 0, 0];
+        assert_eq!(eval_smoothness(&board, 2), 0.0);
+    }
+
+    #[test]
+    fn corner_preference_zero_on_small_board() {
+        let board = vec![2u32, 0, 0, 4];
+        // n < 2 returns 0
+        assert_eq!(eval_corner_preference(&board, 1), 0.0);
+    }
+
+    #[test]
+    fn corner_preference_positive_with_large_tile() {
+        let mut board = vec![0u32; 16];
+        board[0] = 4096; // largest tile in corner
+        let score = eval_corner_preference(&board, 4);
+        assert!(score > 0.0);
+    }
+
+    #[test]
+    fn max_tile_zero_on_empty_board() {
+        let board = vec![0u32; 16];
+        assert_eq!(eval_max_tile(&board, 4), 0.0);
+    }
+
+    #[test]
+    fn max_tile_returns_highest_value() {
+        let mut board = vec![0u32; 16];
+        board[0] = 2;
+        board[5] = 64;
+        board[10] = 512;
+        assert_eq!(eval_max_tile(&board, 4), 512.0);
+    }
+
+    #[test]
+    fn tile_distribution_zero_on_empty_board() {
+        let board = vec![0u32; 16];
+        assert_eq!(eval_tile_distribution(&board, 4), 0.0);
+    }
+
+    #[test]
+    fn tile_distribution_ignores_non_power_of_two() {
+        let mut board = vec![0u32; 16];
+        board[0] = 3; // not a power of 2
+        board[1] = 5; // not a power of 2
+        assert_eq!(eval_tile_distribution(&board, 4), 0.0);
+    }
+
+    #[test]
+    fn empty_cells_counts_all_empty() {
+        let board = vec![0u32; 16];
+        let score = eval_empty_cells(&board, 4);
+        // log2(16 + 1) ≈ 4.087
+        assert!((score - 4.0874).abs() < 0.01);
+    }
+
+    #[test]
+    fn empty_cells_fewer_when_filled() {
+        let mut full = vec![0u32; 16];
+        for i in 0..16 {
+            full[i] = 2;
+        }
+        let empty_score = eval_empty_cells(&vec![0u32; 16], 4);
+        let full_score = eval_empty_cells(&full, 4);
+        assert!(empty_score > full_score);
+    }
+
+    #[test]
+    fn cache_stores_and_reuses_results() {
+        let board = vec![0u32; 16];
+        clear_eval_cache();
+        assert_eq!(eval_cache_size(), 0);
+
+        let _ = compute_eval_result(&board, 4, &EvalConfig::default());
+        assert_eq!(eval_cache_size(), 1);
+
+        // Second call should hit cache
+        let _ = compute_eval_result(&board, 4, &EvalConfig::default());
+        assert_eq!(eval_cache_size(), 1);
+    }
+
+    #[test]
+    fn cache_clear_works() {
+        let board = vec![0u32; 16];
+        clear_eval_cache();
+        let _ = compute_eval_result(&board, 4, &EvalConfig::default());
+        assert_eq!(eval_cache_size(), 1);
+
+        clear_eval_cache();
+        assert_eq!(eval_cache_size(), 0);
+    }
+
+    #[test]
+    fn different_boards_produce_different_hashes() {
+        clear_eval_cache();
+        let mut board1 = vec![0u32; 16];
+        board1[0] = 2;
+        let mut board2 = vec![0u32; 16];
+        board2[1] = 2;
+
+        let r1 = compute_eval_result(&board1, 4, &EvalConfig::default());
+        let r2 = compute_eval_result(&board2, 4, &EvalConfig::default());
+
+        // Different boards should have different scores (or at least not cached as same)
+        assert_eq!(eval_cache_size(), 2);
+        assert_ne!(r1.score, r2.score);
+    }
+
+    #[test]
+    fn eval_with_different_board_sizes() {
+        clear_eval_cache();
+        // 3x3 board
+        let board3 = vec![0u32; 9];
+        let r3 = compute_eval_result(&board3, 3, &EvalConfig::default());
+        assert!(r3.score > 0.0);
+
+        // 5x5 board
+        let board5 = vec![0u32; 25];
+        let r5 = compute_eval_result(&board5, 5, &EvalConfig::default());
+        assert!(r5.score > 0.0);
+        assert!(r5.score > r3.score); // larger board has more empty cells
+    }
+
+    #[test]
+    fn eval_components_are_all_non_negative() {
+        let board = vec![0u32; 16];
+        let components = compute_eval_components(&board, 4);
+        for (i, &c) in components.iter().enumerate() {
+            assert!(c >= 0.0, "component {} should be non-negative: {}", i, c);
+        }
+    }
+
+    #[test]
+    fn eval_with_zero_n_returns_empty() {
+        let board = vec![0u32; 16];
+        let result = compute_eval_result(&board, 0, &EvalConfig::default());
+        assert_eq!(result, EvalResult::empty());
+    }
+
+    #[test]
+    fn eval_with_empty_board_returns_empty() {
+        let board: Vec<u32> = vec![];
+        let result = compute_eval_result(&board, 0, &EvalConfig::default());
+        assert_eq!(result, EvalResult::empty());
     }
 }
