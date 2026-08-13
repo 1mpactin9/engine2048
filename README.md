@@ -1,16 +1,17 @@
 <div align="center">
-    <h1>2048 Engine</h1>
+  <h1>2048 Engine</h1>
 
-> [Prerequisites](#prerequisites) • [Installation](#quick-start) • [Development](#build)
+  <p>
+    <a href="#prerequisites">Prerequisites</a> • 
+    <a href="#build">Installation</a> • 
+    <a href="#quick-access">Documentation</a>
+  </p>
 
-[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Actions](https://img.shields.io/github/actions/workflow/status/1mpactin9/engine2048/ci.yml?branch=main)](https://github.com/1mpactin9/engine2048/actions)
-
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/1mpactin9/engine2048" alt="License"></a>
+  <a href="https://github.com/1mpactin9/engine2048/actions"><img src="https://img.shields.io/github/actions/workflow/status/1mpactin9/engine2048/ci.yml" alt="Actions"></a>
 </div>
 
-A clean, responsive 2048 game built with TypeScript, Vite, and a Rust/WASM game engine. Still in progress, but it works! Currently has a guarantee high success rate for 4x4 boards to get to **8192**!
-
-NOTE that the engine will include features such as RNG Manipulation and Deterministic Algorithms, to explore best case scenarios, in such way the game is NOT random and NOT fair. It is not applicable to real games. meanwhile there are also support for COMPLETELY LEGIT GAMEPLAY.
+A clean, responsive 2048 game built with TypeScript, Vite, and a Rust/WASM game engine. Still in progress, but works!
 
 ## Prerequisites
 
@@ -26,26 +27,12 @@ Install Rust + Cargo first, then:
 cargo install wasm-pack
 ```
 
-## Quick start
-
-```bash
-npm install          # install dependencies
-npm run dev          # start the dev server
-```
-
 ## Build
 
-Run this sequence to start from a completely clean state:
-
 ```bash
-# remove generated artifacts
-rm -rf node_modules/ dist/ engine/pkg/ engine/target/
-
-# reinstall dependencies
-npm install
-
-# clean full build
-npm run build
+npm install          # dependencies
+npm run build        # run build
+npm run dev          # start dev
 ```
 
 ## Verification
@@ -77,4 +64,17 @@ npm run preview
 | [Benchmark Result](docs/benchmark.md) | some example benchmark results |
 | [Developer Documentation](docs/dev.md) | throuogh project overview |
 
-If you are a rights holder and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly. 
+## License
+
+**Copyright (C) 2026 1mpactin9.**
+This project is licensed under the GNU General Public License v3.0.
+
+## Credits
+
+This project interacts with the following external open-source tools:
+
+- [ziap/2048-ai](https://github.com/ziap/2048-ai) - Licensed under MIT
+- [nneonneo/2048-ai](https://github.com/nneonneo/2048-ai) - Licensed under MIT
+- [game-difficulty/2048EndgameTablebase](https://github.com/game-difficulty/2048EndgameTablebase) - Licensed under GPL-3.0
+
+> If you are a rights holder and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly.
