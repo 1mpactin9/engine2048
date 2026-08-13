@@ -96,6 +96,13 @@ private:
         return best_move_idx;
     }
 
+    // score_tilechoose(cprob): cprob is the probability of *reaching* the
+    // current board state (before spawning a tile).  A child is one of
+    // num_empty possible spawn positions × 0.9 probability of a 2-tile or
+    // 0.1 probability of a 4-tile, so each child's probability is
+    // cprob / num_empty * weight.  We do NOT divide cprob here; instead we
+    // let score_move do the per-position division so the value of cprob
+    // stays semantically consistent across both chance and max nodes.
     float score_tilechoose(Ctx& ctx, board_t board, float cprob) {
         if (cprob < cfg_.cprob_thresh || ctx.curdepth >= ctx.depth_limit) {
             ctx.maxdepth = std::max(ctx.curdepth, ctx.maxdepth);
@@ -112,15 +119,14 @@ private:
         }
 
         int num_open = count_empty(board);
-        cprob /= num_open;
 
         float res = 0.0f;
         board_t tmp = board;
         board_t tile_2 = 1;
         while (tile_2) {
             if ((tmp & 0xf) == 0) {
-                res += score_move(ctx, board | tile_2, cprob * 0.9f) * 0.9f;
-                res += score_move(ctx, board | (tile_2 << 1), cprob * 0.1f) * 0.1f;
+                res += score_move(ctx, board | tile_2, cprob / num_open * 0.9f) * 0.9f;
+                res += score_move(ctx, board | (tile_2 << 1), cprob / num_open * 0.1f) * 0.1f;
             }
             tmp >>= 4;
             tile_2 <<= 4;
@@ -134,6 +140,11 @@ private:
         return res;
     }
 
+    // score_move(cprob): cprob is the probability of reaching the board
+    // *after* the player's move but *before* the tile spawn (i.e. the
+    // probability of the max-node we are about to evaluate).  The division
+    // by num_open (to get per-position spawn probability) happens here
+    // before recursing into score_tilechoose, so cprob stays consistent.
     float score_move(Ctx& ctx, board_t board, float cprob) {
         float best = 0.0f;
         ctx.curdepth++;
@@ -141,7 +152,18 @@ private:
             board_t nb = tables_.execute_move(m, board);
             ctx.moves_evaled++;
             if (nb != board) {
-                best = std::max(best, score_tilechoose(ctx, nb, cprob));
+                // cprob here is the probability of reaching `board` (the
+                // board state *after* this move).  Each spawn position has
+                // equal probability cprob / num_open, so we pass that to
+                // the child chance node.
+                int num_open = count_empty(nb);
+                if (num_open > 0) {
+                    float per_pos = cprob / float(num_open);
+                    best = std::max(best, score_tilechoose(ctx, nb, per_pos));
+                } else {
+                    // Board full — leaf; score it directly.
+                    best = std::max(best, tables_.score_heur(nb));
+                }
             }
         }
         ctx.curdepth--;

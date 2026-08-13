@@ -75,7 +75,13 @@ inline GameResult play_one_game(Engine& engine, uint64_t seed, bool reset_cache_
 
     auto t1 = std::chrono::steady_clock::now();
     result.elapsed_sec = std::chrono::duration<double>(t1 - t0).count();
-    result.score = uint64_t(engine.score_actual(board));
+    // Use a saturating conversion to avoid silent wrapping when the float
+    // score exceeds what uint64 can represent. A game that reaches very
+    // high tiles (e.g. 65536+) can produce a raw score exceeding 2^64.
+    float raw_score = engine.score_actual(board);
+    result.score = raw_score > 0.0f
+        ? (raw_score >= double(uint64_t(-1)) ? uint64_t(-1) : uint64_t(raw_score))
+        : 0ULL;
     result.max_tile = get_max_rank(board) == 0 ? 0 : (1 << get_max_rank(board));
     return result;
 }

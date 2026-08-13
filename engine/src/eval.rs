@@ -1,5 +1,4 @@
-pub const MAX_BOARD_SIZE: usize = 8;
-pub const MAX_CELLS: usize = MAX_BOARD_SIZE * MAX_BOARD_SIZE;
+pub use crate::heuristic::{heuristic_flat, snake_score_flat};
 
 #[derive(Debug, Clone)]
 pub struct EvalConfig {
@@ -80,6 +79,20 @@ impl EvalMode {
     }
 }
 
+/// Component indices for `EvalResult.components`.
+/// Keep in sync with `EvalConfig::default()` weights:
+///   [0] empty_cells, [1] monotony, [2] smoothness,
+///   [3] snake_order, [4] consistency, [5] corner_preference,
+///   [6] max_tile,   [7] tile_distribution
+pub const COMPONENT_EMPTY_CELLS: usize = 0;
+pub const COMPONENT_MONOTONY: usize = 1;
+pub const COMPONENT_SMOOTHNESS: usize = 2;
+pub const COMPONENT_SNAKE_ORDER: usize = 3;
+pub const COMPONENT_CONSISTENCY: usize = 4;
+pub const COMPONENT_CORNER_PREFERENCE: usize = 5;
+pub const COMPONENT_MAX_TILE: usize = 6;
+pub const COMPONENT_TILE_DISTRIBUTION: usize = 7;
+
 pub fn compute_eval_result(board: &[u32], n: usize, config: &EvalConfig) -> EvalResult {
     if n == 0 || board.is_empty() {
         return EvalResult::empty();
@@ -93,12 +106,7 @@ pub fn compute_eval_result(board: &[u32], n: usize, config: &EvalConfig) -> Eval
     let components = compute_eval_components(board, n);
     let score = compute_total_score(&components, config.weights);
 
-    let result = EvalResult::new(
-        score,
-        components,
-        config.depth,
-        1,
-    );
+    let result = EvalResult::new(score, components, config.depth, 1);
 
     EVAL_CACHE.with(|cache| {
         cache.borrow_mut().insert(hash, result.clone());
@@ -129,21 +137,29 @@ fn compute_board_hash(board: &[u32], n: usize) -> u64 {
     hasher.finish()
 }
 
+/// Compute the 8-component evaluation vector for a board.
+///
+/// The first 6 components (empty cells through corner preference) are
+/// computed by delegating to the shared heuristic crate functions defined
+/// in `crate::heuristic`, which are the single source of truth for both
+/// search and eval. Components [6] and [7] (max_tile, tile_distribution)
+/// have no counterpart in the search heuristic.
 pub fn compute_eval_components(board: &[u32], n: usize) -> [f64; 8] {
     let mut components = [0.0f64; 8];
 
-    components[0] = eval_empty_cells(board, n);
-    components[1] = eval_monotony(board, n);
-    components[2] = eval_smoothness(board, n);
-    components[3] = eval_snake_order(board, n);
-    components[4] = eval_consistency(board, n);
-    components[5] = eval_corner_preference(board, n);
-    components[6] = eval_max_tile(board, n);
-    components[7] = eval_tile_distribution(board, n);
+    components[COMPONENT_EMPTY_CELLS] = eval_empty_cells(board, n);
+    components[COMPONENT_MONOTONY] = eval_monotony(board, n);
+    components[COMPONENT_SMOOTHNESS] = eval_smoothness(board, n);
+    components[COMPONENT_SNAKE_ORDER] = snake_score_flat(board, n);
+    components[COMPONENT_CONSISTENCY] = crate::heuristic::snake_consistency_flat(board, n);
+    components[COMPONENT_CORNER_PREFERENCE] = crate::heuristic::corner_reward_flat(board, n);
+    components[COMPONENT_MAX_TILE] = eval_max_tile(board, n);
+    components[COMPONENT_TILE_DISTRIBUTION] = eval_tile_distribution(board, n);
 
     components
 }
 
+/// Dot product of component values and weights.
 pub fn compute_total_score(components: &[f64; 8], weights: [f64; 8]) -> f64 {
     let mut total = 0.0;
     for i in 0..8 {
@@ -152,8 +168,9 @@ pub fn compute_total_score(components: &[f64; 8], weights: [f64; 8]) -> f64 {
     total
 }
 
+/// Empty-cell count expressed as `log2(empty + 1)`, matching the search
+/// weight constant `W_EMPTY = 270.0`.
 pub fn eval_empty_cells(board: &[u32], _n: usize) -> f64 {
-    // Fast path: count empties using SIMD-friendly approach
     let mut empty_count = 0u32;
     for &v in board.iter() {
         empty_count += (v == 0) as u32;
@@ -161,216 +178,89 @@ pub fn eval_empty_cells(board: &[u32], _n: usize) -> f64 {
     (empty_count as f64 + 1.0).log2()
 }
 
+/// Row+column monotony penalty: the sum, over all rows and columns, of
+/// `min(ascending_delta, descending_delta)` where delta is measured on
+/// tile ranks (`log2(tile_value)`).  Mirrors the search heuristic's
+/// `mono` accumulator.
 pub fn eval_monotony(board: &[u32], n: usize) -> f64 {
     if n == 0 {
         return 0.0;
     }
-
     let log_val = |v: u32| -> f64 {
-        if v == 0 {
-            0.0
-        } else {
-            v.trailing_zeros() as f64
-        }
+        if v == 0 { 0.0 } else { v.trailing_zeros() as f64 }
     };
-
     let mut monotony = 0.0;
-
     for r in 0..n {
         let mut inc = 0.0;
         let mut dec = 0.0;
         for c in 0..n - 1 {
             let a = log_val(board[r * n + c]);
             let b = log_val(board[r * n + c + 1]);
-            if a > b {
-                dec += a - b;
-            } else {
-                inc += b - a;
-            }
+            if a > b { dec += a - b; } else { inc += b - a; }
         }
         monotony -= inc.min(dec);
     }
-
     for c in 0..n {
         let mut inc = 0.0;
         let mut dec = 0.0;
         for r in 0..n - 1 {
             let a = log_val(board[r * n + c]);
             let b = log_val(board[(r + 1) * n + c]);
-            if a > b {
-                dec += a - b;
-            } else {
-                inc += b - a;
-            }
+            if a > b { dec += a - b; } else { inc += b - a; }
         }
         monotony -= inc.min(dec);
     }
-
     monotony
 }
 
+/// Smoothness penalty: sum of absolute rank-differences between each
+/// non-empty tile and the next non-empty tile in its row/column.
+/// Mirrors the search heuristic's `smoothness` accumulator.
 pub fn eval_smoothness(board: &[u32], n: usize) -> f64 {
     if n == 0 {
         return 0.0;
     }
-
     let log_val = |v: u32| -> f64 {
-        if v == 0 {
-            0.0
-        } else {
-            v.trailing_zeros() as f64
-        }
+        if v == 0 { 0.0 } else { v.trailing_zeros() as f64 }
     };
-
     let mut smoothness = 0.0;
-
     for r in 0..n {
         for c in 0..n {
             let v_raw = board[r * n + c];
-            if v_raw == 0 {
-                continue;
-            }
+            if v_raw == 0 { continue; }
             let v = log_val(v_raw);
-
             if c + 1 < n {
                 let mut next_c = c + 1;
-                while next_c < n && board[r * n + next_c] == 0 {
-                    next_c += 1;
-                }
+                while next_c < n && board[r * n + next_c] == 0 { next_c += 1; }
                 if next_c < n {
                     smoothness -= (v - log_val(board[r * n + next_c])).abs();
                 }
             }
-
             if r + 1 < n {
                 let mut next_r = r + 1;
-                while next_r < n && board[next_r * n + c] == 0 {
-                    next_r += 1;
-                }
+                while next_r < n && board[next_r * n + c] == 0 { next_r += 1; }
                 if next_r < n {
                     smoothness -= (v - log_val(board[next_r * n + c])).abs();
                 }
             }
         }
     }
-
     smoothness
 }
 
-pub fn eval_snake_order(board: &[u32], n: usize) -> f64 {
-    if n == 0 {
-        return 0.0;
-    }
-
-    let weights = build_snake_weights(n);
-    let mut best_score = f64::NEG_INFINITY;
-
-    for w in &weights {
-        let mut score = 0.0;
-        for i in 0..n * n {
-            let v = board[i];
-            let lv = if v == 0 { 0.0 } else { v.trailing_zeros() as f64 };
-            score += lv * w[i];
-        }
-        best_score = best_score.max(score);
-    }
-
-    best_score
-}
-
-pub fn eval_consistency(board: &[u32], n: usize) -> f64 {
-    if n == 0 {
-        return 0.0;
-    }
-
-    let weights = build_snake_weights(n);
-    let mut scores = vec![0.0f64; weights.len()];
-
-    for (i, w) in weights.iter().enumerate() {
-        for j in 0..n * n {
-            let v = board[j];
-            let lv = if v == 0 { 0.0 } else { v.trailing_zeros() as f64 };
-            scores[i] += lv * w[j];
-        }
-    }
-
-    let max_score = scores.iter().copied().fold(f64::NEG_INFINITY, f64::max);
-    if max_score <= 0.0 {
-        return 0.0;
-    }
-
-    let threshold = max_score * 0.5;
-    scores.iter().filter(|&&s| s > threshold).count() as f64
-}
-
-pub fn eval_corner_preference(board: &[u32], n: usize) -> f64 {
-    if n < 2 {
-        return 0.0;
-    }
-
-    let corners = [(0, 0), (0, n - 1), (n - 1, 0), (n - 1, n - 1)];
-    let max_dist = 2.0 * (n as f64 - 1.0);
-
-    let closeness = |r: usize, c: usize| -> f64 {
-        let dist = corners
-            .iter()
-            .map(|&(cr, cc)| {
-                let dr = (r as isize - cr as isize).unsigned_abs() as f64;
-                let dc = (c as isize - cc as isize).unsigned_abs() as f64;
-                dr + dc
-            })
-            .fold(f64::INFINITY, f64::min);
-        1.0 - dist / max_dist
-    };
-
-    let mut reward = 0.0;
-    let mut max_val = 0u32;
-    let mut max_pos = (0usize, 0usize);
-
-    for r in 0..n {
-        for c in 0..n {
-            let v = board[r * n + c];
-            if v == 0 {
-                continue;
-            }
-            let rank = v.trailing_zeros() as f64;
-            reward += rank * closeness(r, c);
-
-            if v > max_val {
-                max_val = v;
-                max_pos = (r, c);
-            }
-        }
-    }
-
-    if max_val > 0 {
-        let max_rank = max_val.trailing_zeros() as f64;
-        reward += max_rank * closeness(max_pos.0, max_pos.1) * 1.5;
-    }
-
-    reward
-}
-
-pub fn eval_max_tile(board: &[u32], n: usize) -> f64 {
-    if n == 0 {
-        return 0.0;
-    }
-
+/// Max tile value on the board.  Not used by the search heuristic; used
+/// only as a post-game eval component (index 6).
+pub fn eval_max_tile(board: &[u32], _n: usize) -> f64 {
     board.iter().copied().fold(0.0, |max, v| {
-        if v as f64 > max {
-            v as f64
-        } else {
-            max
-        }
+        if v as f64 > max { v as f64 } else { max }
     })
 }
 
-pub fn eval_tile_distribution(board: &[u32], n: usize) -> f64 {
-    if n == 0 {
-        return 0.0;
-    }
-
-    let mut tile_counts = vec![0u32; 16];
+/// Tile-distribution score: a measure of how well-represented different
+/// tile powers are on the board.  Not used by the search heuristic;
+/// used only as a post-game eval component (index 7).
+pub fn eval_tile_distribution(board: &[u32], _n: usize) -> f64 {
+    let mut tile_counts = [0u32; 16];
     for &v in board.iter() {
         if v > 0 && v.is_power_of_two() {
             let idx = v.trailing_zeros() as usize;
@@ -379,77 +269,13 @@ pub fn eval_tile_distribution(board: &[u32], n: usize) -> f64 {
             }
         }
     }
-
     let mut distribution = 0.0;
     for (i, &count) in tile_counts.iter().enumerate() {
         if count > 0 {
             distribution += (count as f64).log10() * (i as f64).sqrt();
         }
     }
-
     distribution
-}
-
-fn build_snake_weights(n: usize) -> Vec<[f64; MAX_CELLS]> {
-    let mut weights = Vec::new();
-    let base = (n - 1) * 4;
-
-    for offset in 0..4 {
-        if base + offset < 4 * MAX_BOARD_SIZE {
-            weights.push(SNAKE_WEIGHTS[base + offset]);
-        }
-    }
-
-    weights
-}
-
-static SNAKE_WEIGHTS: [[f64; MAX_CELLS]; 4 * MAX_BOARD_SIZE] = build_all_snake_weights();
-
-const fn build_snake_weights_for_n(n: usize) -> [f64; MAX_CELLS] {
-    let mut w = [0.0f64; MAX_CELLS];
-    let mut val = 1.0f64;
-    let mut r = 0;
-    while r < n {
-        let start = if r % 2 == 0 { 0 } else { n - 1 };
-        let mut k = 0;
-        while k < n {
-            let c = if r % 2 == 0 { start + k } else { start - k };
-            w[r * n + c] = val;
-            k += 1;
-        }
-        val *= 0.5;
-        r += 1;
-    }
-    w
-}
-
-const fn build_all_snake_weights() -> [[f64; MAX_CELLS]; 4 * MAX_BOARD_SIZE] {
-    let mut all = [[0.0f64; MAX_CELLS]; 4 * MAX_BOARD_SIZE];
-    let mut n = 1;
-    while n <= MAX_BOARD_SIZE {
-        let idx = (n - 1) * 4;
-        let w0 = build_snake_weights_for_n(n);
-        all[idx] = w0;
-        all[idx + 1] = rotate_90(&all[idx], n);
-        all[idx + 2] = rotate_90(&all[idx + 1], n);
-        all[idx + 3] = rotate_90(&all[idx + 2], n);
-        n += 1;
-    }
-    all
-}
-
-const fn rotate_90(w: &[f64; MAX_CELLS], n: usize) -> [f64; MAX_CELLS] {
-    let mut out = [0.0f64; MAX_CELLS];
-    let mut r = 0;
-    while r < n {
-        let mut c = 0;
-        while c < n {
-            out[c * n + (n - 1 - r)] = w[r * n + c];
-            c += 1;
-        }
-        r += 1;
-    }
-    out
 }
 
 #[cfg(test)]
@@ -549,5 +375,21 @@ mod tests {
         board[4] = 8;
         let eval = eval_tile_distribution(&board, 4);
         assert!(eval > 0.0);
+    }
+
+    #[test]
+    fn eval_components_match_heuristic_for_shared_terms() {
+        // Verify that the eval's shared components agree with the heuristic
+        // module's functions on a handful of sample boards.
+        use crate::heuristic::{snake_score_flat, snake_consistency_flat, corner_reward_flat};
+        let board = vec![0u32; 16];
+        board[0] = 2048;
+        board[1] = 1024;
+        board[2] = 512;
+
+        let components = compute_eval_components(&board, 4);
+        assert!((components[COMPONENT_SNAKE_ORDER] - snake_score_flat(&board, 4)).abs() < 1e-9);
+        assert!((components[COMPONENT_CONSISTENCY] - snake_consistency_flat(&board, 4)).abs() < 1e-9);
+        assert!((components[COMPONENT_CORNER_PREFERENCE] - corner_reward_flat(&board, 4)).abs() < 1e-9);
     }
 }
