@@ -1,5 +1,3 @@
-use crate::board::bits4;
-use crate::board::heur4;
 use crate::Engine;
 
 const MAX_BOARD_SIZE: usize = 8;
@@ -58,27 +56,9 @@ const fn rotate_90_const(w: &[f64; MAX_CELLS], n: usize) -> [f64; MAX_CELLS] {
 
 static SNAKE_WEIGHTS: [[f64; MAX_CELLS]; 4 * MAX_BOARD_SIZE] = build_all_snake_weights();
 
-fn bits4_compatible(board: &[u32]) -> bool {
-    board.len() >= 16
-        && board[..16]
-            .iter()
-            .all(|&v| v == 0 || (v.is_power_of_two() && v.trailing_zeros() < 15))
-}
-
 impl Engine {
     pub(crate) fn heuristic_flat(board: &[u32], n: usize) -> f64 {
-        if false && n == 4 && bits4_compatible(board) {
-            return Self::heuristic_flat_4(board);
-        }
         Self::heuristic_flat_generic(board, n)
-    }
-
-    fn heuristic_flat_4(board: &[u32]) -> f64 {
-        let bits = bits4::from_flat(board);
-        let base = heur4::heur_score_board4(bits);
-        base + W_SNAKE * Self::snake_score_flat(board, 4)
-            + W_CONSISTENCY * Self::snake_consistency_flat(board, 4)
-            + W_CORNER * Self::corner_reward_flat(board, 4)
     }
 
     fn heuristic_flat_generic(board: &[u32], n: usize) -> f64 {

@@ -88,6 +88,7 @@ fn parse_sweep_token(tok: &str, default_size: usize, default_games: usize) -> Op
     })
 }
 
+#[allow(dead_code)]
 struct Args {
     sweep: Vec<ConfigSpec>,
     default_size: usize,
@@ -213,7 +214,7 @@ fn run_one(spec: &ConfigSpec) -> RunStats {
                     dir.map(|d| engine.make_move(d))
                 }
                 HeuristicMode::DetGuarantee => {
-                    let grid = engine.grid().clone();
+                    let _grid = engine.grid().clone();
                     let key = Engine::derive_key(&game_seed);
                     let dir = engine.suggest_move_for_det_guarantee(
                         &key, 0, true, spec.usage,

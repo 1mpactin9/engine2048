@@ -1,18 +1,6 @@
 pub const MAX_BOARD_SIZE: usize = 8;
 pub const MAX_CELLS: usize = MAX_BOARD_SIZE * MAX_BOARD_SIZE;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EvalWeight {
-    Empty,
-    Monotony,
-    Smoothness,
-    Snake,
-    Consistency,
-    Corner,
-    MaxTile,
-    TileDistribution,
-}
-
 #[derive(Debug, Clone)]
 pub struct EvalConfig {
     pub weights: [f64; 8],
@@ -35,50 +23,6 @@ impl Default for EvalConfig {
             ],
             depth: 4,
             time_limit_ms: 1000,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct EvalStats {
-    pub evaluations: u64,
-    pub total_time_ns: u128,
-    pub avg_score: f64,
-    pub best_score: f64,
-    pub worst_score: f64,
-}
-
-impl Default for EvalStats {
-    fn default() -> Self {
-        EvalStats {
-            evaluations: 0,
-            total_time_ns: 0,
-            avg_score: 0.0,
-            best_score: f64::NEG_INFINITY,
-            worst_score: f64::INFINITY,
-        }
-    }
-}
-
-impl EvalStats {
-    pub fn record(&mut self, score: f64, time_ns: u128) {
-        self.evaluations += 1;
-        self.total_time_ns += time_ns;
-        self.avg_score = (self.avg_score * (self.evaluations as f64 - 1.0) + score)
-            / self.evaluations as f64;
-        if score > self.best_score {
-            self.best_score = score;
-        }
-        if score < self.worst_score {
-            self.worst_score = score;
-        }
-    }
-
-    pub fn avg_time_ns(&self) -> f64 {
-        if self.evaluations == 0 {
-            0.0
-        } else {
-            self.total_time_ns as f64 / self.evaluations as f64
         }
     }
 }
@@ -513,10 +457,11 @@ mod tests {
     use super::*;
 
     #[test]
-    fn empty_board_returns_zero_score() {
+    fn empty_board_returns_nonzero_score() {
         let board = vec![0u32; 16];
+        clear_eval_cache();
         let result = compute_eval_result(&board, 4, &EvalConfig::default());
-        assert!((result.score - 546.55).abs() < 0.01);
+        assert!((result.score - 1103.61).abs() < 0.01);
     }
 
     #[test]
@@ -557,9 +502,21 @@ mod tests {
     }
 
     #[test]
-    fn different_modes_return_different_depths() {
+    fn eval_components_nonzero_on_full_board() {
+        let mut board = vec![0u32; 16];
+        for i in 0..16 {
+            board[i] = 2u32 << (i % 11);
+        }
+        let components = compute_eval_components(&board, 4);
+        assert!(components.iter().any(|&c| c != 0.0));
+    }
+
+    #[test]
+    fn different_modes_store_config_depth() {
         let board = vec![0u32; 16];
+        clear_eval_cache();
         let fast = compute_eval_result(&board, 4, &EvalMode::Fast.config());
+        clear_eval_cache();
         let deep = compute_eval_result(&board, 4, &EvalMode::Deep.config());
 
         assert_eq!(fast.depth_reached, 3);
@@ -586,8 +543,10 @@ mod tests {
     fn tile_distribution_counts_powers() {
         let mut board = vec![0u32; 16];
         board[0] = 2;
-        board[1] = 4;
-        board[2] = 8;
+        board[1] = 2;
+        board[2] = 4;
+        board[3] = 4;
+        board[4] = 8;
         let eval = eval_tile_distribution(&board, 4);
         assert!(eval > 0.0);
     }

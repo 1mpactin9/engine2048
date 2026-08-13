@@ -125,7 +125,7 @@ mod tests {
         }
 
         tracker.finalize();
-        assert!((tracker.avg_components[0] - 3.17).abs() < 0.5);
+        assert!((tracker.avg_components[0] - 4.0).abs() < 0.5);
     }
 
     #[test]

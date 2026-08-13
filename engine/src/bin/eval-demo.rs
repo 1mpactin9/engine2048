@@ -1,4 +1,4 @@
-use engine2048::{EvalConfig, EvalMode, Engine, EvalTracker};
+use engine2048::{EvalMode, Engine, EvalTracker};
 
 fn main() {
     println!("=== 2048 Evaluation Demo ===\n");

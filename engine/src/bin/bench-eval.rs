@@ -32,7 +32,7 @@ fn benchmark_eval() {
             let mut total_time_ns = 0u128;
 
             for i in 0..TEST_POSITIONS {
-                let board = generate_test_board(n, i as u64);
+                let _board = generate_test_board(n, i as u64);
                 let engine = Engine::with_size(n).unwrap();
                 let start = Instant::now();
                 let _result = engine.evaluate_position_with_config(&config);
