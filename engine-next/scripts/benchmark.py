@@ -33,7 +33,7 @@ SUMMARY_RE = re.compile(
 
 
 def build_command(preset_name, preset, games, seed):
-    cmd = [str(BINARY.absolute()), "--games", str(games), "--seed", str(seed)]
+    cmd = [str(BINARY), "--games", str(games), "--seed", str(seed), "--verbose"]
     cmd += ["--tt-bits", str(preset.get("tt_bits", 22))]
     cmd += ["--cache-depth-limit", str(preset.get("cache_depth_limit", 15))]
     cmd += ["--min-depth", str(preset.get("min_depth", 3))]
@@ -54,22 +54,47 @@ def run_preset(preset_name, preset, games, seed, timeout):
     print(f"  cmd: {' '.join(cmd)}")
 
     start = time.time()
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                             text=True, bufsize=1)
+    lines = []
+    timed_out = False
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, shell=True)
-    except subprocess.TimeoutExpired:
-        print(f"  TIMEOUT after {timeout}s — reduce --games or lower this preset's max_depth")
-        return {"preset": preset_name, "error": "timeout"}
+        while True:
+            elapsed = time.time() - start
+            if elapsed > timeout:
+                proc.kill()
+                timed_out = True
+                break
+            line = proc.stdout.readline()
+            if line:
+                lines.append(line)
+                stripped = line.rstrip()
+                if stripped.startswith("game "):
+                    print(f"  [{elapsed:6.1f}s] {stripped}")
+            elif proc.poll() is not None:
+                break
+    finally:
+        if proc.poll() is None:
+            proc.kill()
     wall = time.time() - start
 
-    if result.returncode != 0:
-        print(f"  ERROR (exit {result.returncode}): {result.stderr[-500:]}")
-        return {"preset": preset_name, "error": "nonzero_exit", "stderr": result.stderr[-500:]}
+    if timed_out:
+        print(f"  TIMEOUT after {timeout}s — {len(lines)} game line(s) completed before timeout. "
+              f"Increase --timeout, or reduce --games, or lower this preset's max_depth in configs/presets.json.")
+        return {"preset": preset_name, "error": "timeout", "games_completed": sum(1 for l in lines if l.startswith("game "))}
 
-    match = SUMMARY_RE.search(result.stdout)
+    result_stdout = "".join(lines)
+    returncode = proc.returncode
+
+    if returncode != 0:
+        print(f"  ERROR (exit {returncode}): {result_stdout[-500:]}")
+        return {"preset": preset_name, "error": "nonzero_exit", "stderr": result_stdout[-500:]}
+
+    match = SUMMARY_RE.search(result_stdout)
     if not match:
         print("  Could not parse output:")
-        print(result.stdout[-500:])
-        return {"preset": preset_name, "error": "parse_failed", "raw": result.stdout}
+        print(result_stdout[-500:])
+        return {"preset": preset_name, "error": "parse_failed", "raw": result_stdout}
 
     data = match.groupdict()
     data = {k: float(v) if "." in v else int(v) for k, v in data.items()}
@@ -86,11 +111,13 @@ def main():
     parser = argparse.ArgumentParser(description="Run 2048 engine benchmark presets")
     parser.add_argument("--presets", nargs="*", default=None,
                          help="Subset of preset names to run (default: all)")
-    parser.add_argument("--games", type=int, default=5, help="Games per preset")
+    parser.add_argument("--games", type=int, default=3, help="Games per preset (default 3; increase once you've confirmed timing)")
     parser.add_argument("--seed", type=int, default=1, help="Base RNG seed")
-    parser.add_argument("--timeout", type=int, default=7200,
-                         help="Per-preset timeout in seconds (games can run 500-2000+ moves each; "
-                              "default is 2h, lower only if you reduce --games)")
+    parser.add_argument("--timeout", type=int, default=None,
+                         help="Per-preset timeout in seconds. Default: 300 seconds per game "
+                              "(individual games have been measured taking 30s-190s+ depending on "
+                              "config and how far they progress; 300s/game is a safety margin, not "
+                              "a typical case). Override this only if you have a specific reason to.")
     parser.add_argument("--out", default=None, help="Write JSON results to this file")
     args = parser.parse_args()
 
@@ -101,12 +128,17 @@ def main():
     presets = json.loads(PRESETS_FILE.read_text())
     names = args.presets if args.presets else list(presets.keys())
 
+    timeout = args.timeout if args.timeout is not None else max(300, args.games * 300)
+    if args.timeout is None:
+        print(f"(using default timeout: {timeout}s = {args.games} games x 300s/game safety margin; "
+              f"pass --timeout explicitly to override)")
+
     results = []
     for name in names:
         if name not in presets:
             print(f"Unknown preset: {name}", file=sys.stderr)
             continue
-        results.append(run_preset(name, presets[name], args.games, args.seed, args.timeout))
+        results.append(run_preset(name, presets[name], args.games, args.seed, timeout))
 
     print("\n\n=== Comparison table ===")
     header = f"{'preset':<24}{'avg_score':>12}{'avg_tile':>10}{'win%':>8}{'s/move avg':>12}{'hit%':>8}{'wall_s':>10}"

@@ -92,6 +92,7 @@ int main(int argc, char** argv) {
             printf("game %d: score=%llu max_tile=%d moves=%d time=%.2fs evaled=%llu hits=%llu\n",
                    g, (unsigned long long)r.score, r.max_tile, r.moves, r.elapsed_sec,
                    (unsigned long long)r.total_moves_evaled, (unsigned long long)r.total_cache_hits);
+            fflush(stdout);
         }
     }
 
