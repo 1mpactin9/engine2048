@@ -5,6 +5,10 @@ const MAX_SAMPLED_CELLS_CAP: usize = 16;
 const TIME_CHECK_NODE_INTERVAL: u64 = 512;
 const HARD_TIME_MULTIPLIER: f64 = 2.0;
 
+/// How many extra search plies to add when the board is nearly full
+/// (`<= ENDGAME_EMPTY_THRESHOLD` empties).  Going deeper in the endgame
+/// is expensive but crucial — merges open cells and the position is
+/// fragile enough that a shallow search blunders easily.
 fn endgame_extra_depth(n: usize) -> usize {
     match n {
         0..=4 => 30,

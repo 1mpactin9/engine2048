@@ -1,4 +1,4 @@
-pub use crate::heuristic::{heuristic_flat, snake_score_flat};
+pub use crate::heuristic::{snake_score_flat};
 
 #[derive(Debug, Clone)]
 pub struct EvalConfig {
