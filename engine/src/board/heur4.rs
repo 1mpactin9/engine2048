@@ -96,6 +96,7 @@ fn score_rows(board: Board4, table: &[f32]) -> f64 {
     (0..4).map(|r| table[get_row(board, r) as usize] as f64).sum()
 }
 
+#[allow(dead_code)]
 pub fn heur_score_board4(bits: Board4) -> f64 {
     let table = row_heur_table();
     score_rows(bits, table) + score_rows(transpose(bits), table)

@@ -382,7 +382,7 @@ mod tests {
         // Verify that the eval's shared components agree with the heuristic
         // module's functions on a handful of sample boards.
         use crate::heuristic::{snake_score_flat, snake_consistency_flat, corner_reward_flat};
-        let board = vec![0u32; 16];
+        let mut board = vec![0u32; 16];
         board[0] = 2048;
         board[1] = 1024;
         board[2] = 512;

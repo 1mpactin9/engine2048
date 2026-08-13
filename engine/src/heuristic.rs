@@ -252,7 +252,9 @@ impl crate::Engine {
     pub(crate) fn heuristic_flat(board: &[u32], n: usize) -> f64 {
         heuristic_flat(board, n)
     }
-    pub(crate) fn snake_score_flat(board: &[u32], n: usize) -> f64 {
+    /// Re-export for tests that call `Engine::snake_score_flat`.
+    #[allow(dead_code)]
+    pub fn snake_score_flat(board: &[u32], n: usize) -> f64 {
         snake_score_flat(board, n)
     }
 }
