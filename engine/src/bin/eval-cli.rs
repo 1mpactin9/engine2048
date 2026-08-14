@@ -1,4 +1,4 @@
-use engine2048::{EvalMode, Engine, EvalTracker};
+use engine2048::{Engine, EvalMode, EvalTracker};
 use std::time::Instant;
 
 fn main() {

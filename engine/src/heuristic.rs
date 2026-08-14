@@ -173,7 +173,11 @@ pub(crate) fn snake_scores_flat(board: &[u32], n: usize) -> [f64; 4] {
     let n2 = n * n;
     for i in 0..n2 {
         let v = board[i];
-        let lv = if v == 0 { 0.0 } else { v.trailing_zeros() as f64 };
+        let lv = if v == 0 {
+            0.0
+        } else {
+            v.trailing_zeros() as f64
+        };
         scores[0] += lv * SNAKE_WEIGHTS[base][i];
         scores[1] += lv * SNAKE_WEIGHTS[base + 1][i];
         scores[2] += lv * SNAKE_WEIGHTS[base + 2][i];

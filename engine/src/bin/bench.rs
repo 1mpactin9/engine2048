@@ -198,9 +198,7 @@ fn run_one(spec: &ConfigSpec) -> RunStats {
                 break;
             }
             let outcome = match spec.mode {
-                HeuristicMode::Standard => {
-                    engine.auto_play_step_with_usage(None, spec.usage)
-                }
+                HeuristicMode::Standard => engine.auto_play_step_with_usage(None, spec.usage),
                 HeuristicMode::Guarantee => {
                     let dir = engine.suggest_move_for_guarantee(spec.usage);
                     dir.map(|d| engine.make_move(d))
@@ -208,17 +206,14 @@ fn run_one(spec: &ConfigSpec) -> RunStats {
                 HeuristicMode::Deterministic => {
                     let grid = engine.grid().clone();
                     let key = Engine::derive_key(&game_seed);
-                    let dir = Engine::suggest_move_det_with_usage(
-                        &grid, None, &key, 0, true, spec.usage,
-                    );
+                    let dir =
+                        Engine::suggest_move_det_with_usage(&grid, None, &key, 0, true, spec.usage);
                     dir.map(|d| engine.make_move(d))
                 }
                 HeuristicMode::DetGuarantee => {
                     let _grid = engine.grid().clone();
                     let key = Engine::derive_key(&game_seed);
-                    let dir = engine.suggest_move_for_det_guarantee(
-                        &key, 0, true, spec.usage,
-                    );
+                    let dir = engine.suggest_move_for_det_guarantee(&key, 0, true, spec.usage);
                     dir.map(|d| engine.make_move(d))
                 }
             };
@@ -234,7 +229,11 @@ fn run_one(spec: &ConfigSpec) -> RunStats {
         }
 
         let max_tile = engine.grid().iter().flatten().copied().max().unwrap_or(0);
-        let cap_label = if capped { "  [CAPPED, not game-over]" } else { "" };
+        let cap_label = if capped {
+            "  [CAPPED, not game-over]"
+        } else {
+            ""
+        };
         println!(
             "  [{}] game {:>3}: score = {:>7}  max tile = {:>6}  moves = {:>7}  ({:.1}s){}",
             spec.label,
@@ -280,14 +279,19 @@ fn print_summary(stats: &RunStats) {
         "\n--- {} ({}x{}, {:?}/{:?}, no power-ups) ---",
         stats.label, stats.size, stats.size, stats.usage, stats.mode
     );
-    println!(
-        "min={} median={} avg={:.0} max={}",
-        min, median, avg, max
-    );
+    println!("min={} median={} avg={:.0} max={}", min, median, avg, max);
     println!(
         ">=2048: {}/{}  >=4096: {}/{}  >=8192: {}/{}  >=100k: {}/{}  >=200k: {}/{}",
-        at_least_2048, stats.games, at_least_4096, stats.games, at_least_8192, stats.games,
-        at_least_100k, stats.games, at_least_200k, stats.games
+        at_least_2048,
+        stats.games,
+        at_least_4096,
+        stats.games,
+        at_least_8192,
+        stats.games,
+        at_least_100k,
+        stats.games,
+        at_least_200k,
+        stats.games
     );
     println!(
         "total wall time: {:.1}s ({:.1}s/game)",
@@ -350,11 +354,25 @@ fn main() {
             .append(true)
             .open(path)
             .expect("open log file");
-        writeln!(f, "\n## sweep run @ {}s wall total", overall_start.elapsed().as_secs_f64()).ok();
+        writeln!(
+            f,
+            "\n## sweep run @ {}s wall total",
+            overall_start.elapsed().as_secs_f64()
+        )
+        .ok();
         writeln!(
             f,
             "{:<40} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>7} {:>9}",
-            "config", "min", "median", "avg", "max", ">=2048", ">=4096", ">=8192", ">=100k", "wall(s)"
+            "config",
+            "min",
+            "median",
+            "avg",
+            "max",
+            ">=2048",
+            ">=4096",
+            ">=8192",
+            ">=100k",
+            "wall(s)"
         )
         .ok();
         for stats in &all_runs {

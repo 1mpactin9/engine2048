@@ -86,15 +86,8 @@ pub fn suggest_move_det(
     };
     let key = Engine::derive_key(seed);
     let usage = UsageMode::from_code(usage_code);
-    Engine::suggest_move_det_with_usage(
-        &grid,
-        depth_opt,
-        &key,
-        calls as u64,
-        manipulate,
-        usage,
-    )
-    .map_or(NO_MOVE, direction_code)
+    Engine::suggest_move_det_with_usage(&grid, depth_opt, &key, calls as u64, manipulate, usage)
+        .map_or(NO_MOVE, direction_code)
 }
 
 #[wasm_bindgen]

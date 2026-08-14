@@ -1,4 +1,4 @@
-use engine2048::{EvalMode, Engine, EvalTracker};
+use engine2048::{Engine, EvalMode, EvalTracker};
 
 fn main() {
     println!("=== 2048 Evaluation Demo ===\n");
@@ -19,8 +19,15 @@ fn main() {
 
     for mode in &[EvalMode::Fast, EvalMode::Balanced, EvalMode::Deep] {
         let result = engine.evaluate_position(*mode);
-        println!("   {:10}: score = {:8.2}", format!("{:?}", mode), result.score);
-        println!("            depth = {}, nodes = {}", result.depth_reached, result.nodes_evaluated);
+        println!(
+            "   {:10}: score = {:8.2}",
+            format!("{:?}", mode),
+            result.score
+        );
+        println!(
+            "            depth = {}, nodes = {}",
+            result.depth_reached, result.nodes_evaluated
+        );
     }
 
     // Demo 2: Component breakdown
@@ -63,7 +70,10 @@ fn main() {
 
     println!("   Sorted board:    {:8.2}", sorted_result.score);
     println!("   Scrambled board: {:8.2}", scrambled_result.score);
-    println!("   Difference:      {:8.2}", sorted_result.score - scrambled_result.score);
+    println!(
+        "   Difference:      {:8.2}",
+        sorted_result.score - scrambled_result.score
+    );
 
     println!("\n=== Demo Complete ===");
 }

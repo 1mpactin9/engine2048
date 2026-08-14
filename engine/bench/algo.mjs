@@ -15,7 +15,7 @@ export function makeParams(overrides = {}) {
         { fracDenom: 5, minEmpty: 3, bonus: 1 },
       ],
     },
-    overrides
+    overrides,
   );
 }
 

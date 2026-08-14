@@ -1,4 +1,4 @@
-pub use crate::heuristic::{snake_score_flat};
+pub use crate::heuristic::snake_score_flat;
 
 #[derive(Debug, Clone)]
 pub struct EvalConfig {
@@ -10,16 +10,7 @@ pub struct EvalConfig {
 impl Default for EvalConfig {
     fn default() -> Self {
         EvalConfig {
-            weights: [
-                270.0,
-                25.0,
-                11.0,
-                46.0,
-                18.0,
-                10.0,
-                5.0,
-                3.0,
-            ],
+            weights: [270.0, 25.0, 11.0, 46.0, 18.0, 10.0, 5.0, 3.0],
             depth: 4,
             time_limit_ms: 1000,
         }
@@ -187,7 +178,11 @@ pub fn eval_monotony(board: &[u32], n: usize) -> f64 {
         return 0.0;
     }
     let log_val = |v: u32| -> f64 {
-        if v == 0 { 0.0 } else { v.trailing_zeros() as f64 }
+        if v == 0 {
+            0.0
+        } else {
+            v.trailing_zeros() as f64
+        }
     };
     let mut monotony = 0.0;
     for r in 0..n {
@@ -196,7 +191,11 @@ pub fn eval_monotony(board: &[u32], n: usize) -> f64 {
         for c in 0..n - 1 {
             let a = log_val(board[r * n + c]);
             let b = log_val(board[r * n + c + 1]);
-            if a > b { dec += a - b; } else { inc += b - a; }
+            if a > b {
+                dec += a - b;
+            } else {
+                inc += b - a;
+            }
         }
         monotony -= inc.min(dec);
     }
@@ -206,7 +205,11 @@ pub fn eval_monotony(board: &[u32], n: usize) -> f64 {
         for r in 0..n - 1 {
             let a = log_val(board[r * n + c]);
             let b = log_val(board[(r + 1) * n + c]);
-            if a > b { dec += a - b; } else { inc += b - a; }
+            if a > b {
+                dec += a - b;
+            } else {
+                inc += b - a;
+            }
         }
         monotony -= inc.min(dec);
     }
@@ -221,24 +224,34 @@ pub fn eval_smoothness(board: &[u32], n: usize) -> f64 {
         return 0.0;
     }
     let log_val = |v: u32| -> f64 {
-        if v == 0 { 0.0 } else { v.trailing_zeros() as f64 }
+        if v == 0 {
+            0.0
+        } else {
+            v.trailing_zeros() as f64
+        }
     };
     let mut smoothness = 0.0;
     for r in 0..n {
         for c in 0..n {
             let v_raw = board[r * n + c];
-            if v_raw == 0 { continue; }
+            if v_raw == 0 {
+                continue;
+            }
             let v = log_val(v_raw);
             if c + 1 < n {
                 let mut next_c = c + 1;
-                while next_c < n && board[r * n + next_c] == 0 { next_c += 1; }
+                while next_c < n && board[r * n + next_c] == 0 {
+                    next_c += 1;
+                }
                 if next_c < n {
                     smoothness -= (v - log_val(board[r * n + next_c])).abs();
                 }
             }
             if r + 1 < n {
                 let mut next_r = r + 1;
-                while next_r < n && board[next_r * n + c] == 0 { next_r += 1; }
+                while next_r < n && board[next_r * n + c] == 0 {
+                    next_r += 1;
+                }
                 if next_r < n {
                     smoothness -= (v - log_val(board[next_r * n + c])).abs();
                 }
@@ -251,9 +264,10 @@ pub fn eval_smoothness(board: &[u32], n: usize) -> f64 {
 /// Max tile value on the board.  Not used by the search heuristic; used
 /// only as a post-game eval component (index 6).
 pub fn eval_max_tile(board: &[u32], _n: usize) -> f64 {
-    board.iter().copied().fold(0.0, |max, v| {
-        if v as f64 > max { v as f64 } else { max }
-    })
+    board
+        .iter()
+        .copied()
+        .fold(0.0, |max, v| if v as f64 > max { v as f64 } else { max })
 }
 
 /// Tile-distribution score: a measure of how well-represented different
@@ -551,7 +565,7 @@ mod tests {
     fn eval_components_match_heuristic_for_shared_terms() {
         // Verify that the eval's shared components agree with the heuristic
         // module's functions on a handful of sample boards.
-        use crate::heuristic::{snake_score_flat, snake_consistency_flat, corner_reward_flat};
+        use crate::heuristic::{corner_reward_flat, snake_consistency_flat, snake_score_flat};
         let mut board = vec![0u32; 16];
         board[0] = 2048;
         board[1] = 1024;
@@ -559,7 +573,11 @@ mod tests {
 
         let components = compute_eval_components(&board, 4);
         assert!((components[COMPONENT_SNAKE_ORDER] - snake_score_flat(&board, 4)).abs() < 1e-9);
-        assert!((components[COMPONENT_CONSISTENCY] - snake_consistency_flat(&board, 4)).abs() < 1e-9);
-        assert!((components[COMPONENT_CORNER_PREFERENCE] - corner_reward_flat(&board, 4)).abs() < 1e-9);
+        assert!(
+            (components[COMPONENT_CONSISTENCY] - snake_consistency_flat(&board, 4)).abs() < 1e-9
+        );
+        assert!(
+            (components[COMPONENT_CORNER_PREFERENCE] - corner_reward_flat(&board, 4)).abs() < 1e-9
+        );
     }
 }

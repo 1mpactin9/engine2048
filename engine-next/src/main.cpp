@@ -8,7 +8,8 @@
 
 using namespace eng;
 
-struct Args {
+struct Args
+{
     int games = 10;
     uint64_t seed = 1;
     SearchConfig cfg;
@@ -17,34 +18,57 @@ struct Args {
     bool verbose = false;
 };
 
-static float argf(const char* v) { return float(atof(v)); }
-static int   argi(const char* v) { return atoi(v); }
+static float argf(const char *v) { return float(atof(v)); }
+static int argi(const char *v) { return atoi(v); }
 
-static Args parse_args(int argc, char** argv) {
+static Args parse_args(int argc, char **argv)
+{
     Args a;
-    for (int i = 1; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i)
+    {
         std::string k = argv[i];
-        auto next = [&]() -> const char* { return (i + 1 < argc) ? argv[++i] : ""; };
-        if (k == "--games") a.games = argi(next());
-        else if (k == "--seed") a.seed = uint64_t(atoll(next()));
-        else if (k == "--cprob") a.cfg.cprob_thresh = argf(next());
-        else if (k == "--cache-depth-limit") a.cfg.cache_depth_limit = argi(next());
-        else if (k == "--min-depth") a.cfg.min_search_depth = argi(next());
-        else if (k == "--depth-bias") a.cfg.depth_bias = argi(next());
-        else if (k == "--tt-bits") a.cfg.tt_size_pow2 = size_t(1) << argi(next());
-        else if (k == "--no-cache") a.cfg.use_cache = false;
-        else if (k == "--max-depth") a.cfg.max_search_depth = argi(next());
-        else if (k == "--reset-cache-each-game") a.reset_cache_each_game = true;
-        else if (k == "--lost-penalty") a.w.lost_penalty = argf(next());
-        else if (k == "--mono-power") a.w.monotonicity_power = argf(next());
-        else if (k == "--mono-weight") a.w.monotonicity_weight = argf(next());
-        else if (k == "--sum-power") a.w.sum_power = argf(next());
-        else if (k == "--sum-weight") a.w.sum_weight = argf(next());
-        else if (k == "--merges-weight") a.w.merges_weight = argf(next());
-        else if (k == "--empty-weight") a.w.empty_weight = argf(next());
-        else if (k == "--corner-weight") a.w.corner_weight = argf(next());
-        else if (k == "--verbose") a.verbose = true;
-        else if (k == "--help") {
+        auto next = [&]() -> const char *
+        { return (i + 1 < argc) ? argv[++i] : ""; };
+        if (k == "--games")
+            a.games = argi(next());
+        else if (k == "--seed")
+            a.seed = uint64_t(atoll(next()));
+        else if (k == "--cprob")
+            a.cfg.cprob_thresh = argf(next());
+        else if (k == "--cache-depth-limit")
+            a.cfg.cache_depth_limit = argi(next());
+        else if (k == "--min-depth")
+            a.cfg.min_search_depth = argi(next());
+        else if (k == "--depth-bias")
+            a.cfg.depth_bias = argi(next());
+        else if (k == "--tt-bits")
+            a.cfg.tt_size_pow2 = size_t(1) << argi(next());
+        else if (k == "--no-cache")
+            a.cfg.use_cache = false;
+        else if (k == "--max-depth")
+            a.cfg.max_search_depth = argi(next());
+        else if (k == "--reset-cache-each-game")
+            a.reset_cache_each_game = true;
+        else if (k == "--lost-penalty")
+            a.w.lost_penalty = argf(next());
+        else if (k == "--mono-power")
+            a.w.monotonicity_power = argf(next());
+        else if (k == "--mono-weight")
+            a.w.monotonicity_weight = argf(next());
+        else if (k == "--sum-power")
+            a.w.sum_power = argf(next());
+        else if (k == "--sum-weight")
+            a.w.sum_weight = argf(next());
+        else if (k == "--merges-weight")
+            a.w.merges_weight = argf(next());
+        else if (k == "--empty-weight")
+            a.w.empty_weight = argf(next());
+        else if (k == "--corner-weight")
+            a.w.corner_weight = argf(next());
+        else if (k == "--verbose")
+            a.verbose = true;
+        else if (k == "--help")
+        {
             printf("Usage: engine2048 [options]\n"
                    "  --games N               number of games to simulate (default 10)\n"
                    "  --seed N                base RNG seed (default 1)\n"
@@ -66,7 +90,8 @@ static Args parse_args(int argc, char** argv) {
     return a;
 }
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
     Args a = parse_args(argc, argv);
     Engine engine(a.w, a.cfg);
 
@@ -78,7 +103,8 @@ int main(int argc, char** argv) {
     double sum_time = 0;
     int wins_2048 = 0;
 
-    for (int g = 0; g < a.games; ++g) {
+    for (int g = 0; g < a.games; ++g)
+    {
         GameResult r = play_one_game(engine, a.seed + g, a.reset_cache_each_game);
         results.push_back(r);
         sum_score += r.score;
@@ -86,9 +112,11 @@ int main(int argc, char** argv) {
         sum_time += r.elapsed_sec;
         sum_moves_evaled += r.total_moves_evaled;
         sum_cache_hits += r.total_cache_hits;
-        if (r.max_tile >= 2048) wins_2048++;
+        if (r.max_tile >= 2048)
+            wins_2048++;
 
-        if (a.verbose) {
+        if (a.verbose)
+        {
             printf("game %d: score=%llu max_tile=%d moves=%d time=%.2fs evaled=%llu hits=%llu\n",
                    g, (unsigned long long)r.score, r.max_tile, r.moves, r.elapsed_sec,
                    (unsigned long long)r.total_moves_evaled, (unsigned long long)r.total_cache_hits);

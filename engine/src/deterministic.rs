@@ -1,4 +1,6 @@
-use crate::search::{clear_search_deadline, deadline_hit, now_ms, sampled_pairs, set_search_deadline};
+use crate::search::{
+    clear_search_deadline, deadline_hit, now_ms, sampled_pairs, set_search_deadline,
+};
 use crate::transposition::{tt_get, tt_put, zobrist_hash};
 use crate::{Action, Direction, Engine, UsageMode};
 
@@ -150,7 +152,14 @@ impl Engine {
     ) -> Option<(usize, u32, u64)> {
         let mut rng = SeedRng::init(key, calls);
         let mut budget = u64::MAX;
-        Self::predict_spawn_flat_with_usage(board, n, &mut rng, manipulate, UsageMode::Balanced, &mut budget)
+        Self::predict_spawn_flat_with_usage(
+            board,
+            n,
+            &mut rng,
+            manipulate,
+            UsageMode::Balanced,
+            &mut budget,
+        )
     }
 
     pub fn predict_spawn_flat_with_usage(
@@ -387,7 +396,8 @@ impl Engine {
             set_search_deadline(pass_start + total_budget_ms);
             let mut rng = SeedRng::init(key, calls);
             let mut budget = Self::scaled_budget_for_depth(depth, scale);
-            let (dir, val) = Self::best_move_det(grid, depth, &mut budget, &mut rng, manipulate, usage);
+            let (dir, val) =
+                Self::best_move_det(grid, depth, &mut budget, &mut rng, manipulate, usage);
             clear_search_deadline();
             let pass_elapsed = now_ms() - pass_start;
             if dir.is_some() {
@@ -413,8 +423,9 @@ impl Engine {
         manipulate: bool,
         usage: UsageMode,
     ) -> Option<Direction> {
-        let search_depth = Self::endgame_depth(grid, depth.unwrap_or_else(|| Self::auto_depth(grid)))
-            + DET_DEPTH_BONUS;
+        let search_depth =
+            Self::endgame_depth(grid, depth.unwrap_or_else(|| Self::auto_depth(grid)))
+                + DET_DEPTH_BONUS;
         Self::best_move_det_adaptive(grid, search_depth, key, calls, manipulate, usage)
     }
 
@@ -467,7 +478,8 @@ impl Engine {
         let size = grid.len();
         let d = depth.unwrap_or_else(|| Self::auto_depth(grid)) + DET_DEPTH_BONUS;
         let scale = usage.node_budget_scale();
-        let (best_dir, move_val) = Self::best_move_det_adaptive_val(grid, d, key, calls, manipulate, usage);
+        let (best_dir, move_val) =
+            Self::best_move_det_adaptive_val(grid, d, key, calls, manipulate, usage);
         let mut budget = Self::scaled_budget_for_depth(d, scale);
 
         let stuck = best_dir.is_none();
@@ -477,7 +489,9 @@ impl Engine {
 
         const POWERUP_MARGIN: f64 = 90.0;
         let powerup_start = now_ms();
-        set_search_deadline(powerup_start + usage.time_budget_ms() as f64 * DET_HARD_TIME_MULTIPLIER);
+        set_search_deadline(
+            powerup_start + usage.time_budget_ms() as f64 * DET_HARD_TIME_MULTIPLIER,
+        );
 
         let mut best_delete: Option<(usize, usize)> = None;
         let mut best_delete_val = f64::NEG_INFINITY;
@@ -491,7 +505,8 @@ impl Engine {
                     let mut g = grid.clone();
                     g[r][c] = 0;
                     let v =
-                        Self::best_move_det(&g, d, &mut budget, &mut delete_rng, manipulate, usage).1;
+                        Self::best_move_det(&g, d, &mut budget, &mut delete_rng, manipulate, usage)
+                            .1;
                     if v > best_delete_val {
                         best_delete_val = v;
                         best_delete = Some((r, c));
@@ -513,8 +528,7 @@ impl Engine {
                 let tmp = g[a.0][a.1];
                 g[a.0][a.1] = g[b.0][b.1];
                 g[b.0][b.1] = tmp;
-                let v =
-                    Self::best_move_det(&g, d, &mut budget, &mut swap_rng, manipulate, usage).1;
+                let v = Self::best_move_det(&g, d, &mut budget, &mut swap_rng, manipulate, usage).1;
                 if v > best_swap_val {
                     best_swap_val = v;
                     best_swap = Some((a, b));

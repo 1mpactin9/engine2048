@@ -34,11 +34,8 @@ impl EvalTracker {
             self.avg_components[i] += result.components[i];
         }
 
-        self.eval_history.push((
-            position_id,
-            result.score,
-            result.components,
-        ));
+        self.eval_history
+            .push((position_id, result.score, result.components));
     }
 
     pub fn finalize(&mut self) {
@@ -51,9 +48,18 @@ impl EvalTracker {
     pub fn report(&self) -> String {
         let mut report = String::new();
         report.push_str("\n=== Evaluation Summary ===\n\n");
-        report.push_str(&format!("Positions evaluated: {}\n", self.positions_evaluated));
-        report.push_str(&format!("Score range: [{:.2}, {:.2}]\n", self.worst_score, self.best_score));
-        report.push_str(&format!("Average score: {:.2}\n", self.total_score / self.positions_evaluated as f64));
+        report.push_str(&format!(
+            "Positions evaluated: {}\n",
+            self.positions_evaluated
+        ));
+        report.push_str(&format!(
+            "Score range: [{:.2}, {:.2}]\n",
+            self.worst_score, self.best_score
+        ));
+        report.push_str(&format!(
+            "Average score: {:.2}\n",
+            self.total_score / self.positions_evaluated as f64
+        ));
         report.push_str("\nComponent averages:\n");
         for (i, &comp) in self.avg_components.iter().enumerate() {
             report.push_str(&format!("  {:30}: {:.2}\n", component_name(i), comp));
@@ -79,7 +85,7 @@ fn component_name(idx: usize) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::eval::{EvalConfig, compute_eval_result};
+    use crate::eval::{compute_eval_result, EvalConfig};
 
     #[test]
     fn tracker_records_positions() {

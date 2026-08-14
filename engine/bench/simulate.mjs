@@ -1,4 +1,9 @@
-import { makeParams, makeParamsForUsage, slideGrid, suggestMove } from "./algo.mjs";
+import {
+  makeParams,
+  makeParamsForUsage,
+  slideGrid,
+  suggestMove,
+} from "./algo.mjs";
 
 function mulberry32(seed) {
   let a = seed >>> 0;
@@ -76,7 +81,7 @@ export function playGame({
       console.log(
         `  [seed ${seed}] move ${moves} score=${score} empties=${empties} ` +
           `lastMoveMs=${dt.toFixed(1)} worstMs=${worstMoveMs.toFixed(1)} ` +
-          `elapsed=${((performance.now() - gameStart) / 1000).toFixed(1)}s`
+          `elapsed=${((performance.now() - gameStart) / 1000).toFixed(1)}s`,
       );
     }
   }
@@ -91,7 +96,14 @@ export function playGame({
   };
 }
 
-export function runBatch({ games = 10, n = 4, depth, P, seedStart = 1, fourProb = 0.1 }) {
+export function runBatch({
+  games = 10,
+  n = 4,
+  depth,
+  P,
+  seedStart = 1,
+  fourProb = 0.1,
+}) {
   const results = [];
   const t0 = performance.now();
   for (let i = 0; i < games; i++) {
@@ -108,7 +120,17 @@ export function runBatch({ games = 10, n = 4, depth, P, seedStart = 1, fourProb 
   const avgDecisionMs =
     results.reduce((a, r) => a + r.avgDecisionMs, 0) / results.length;
   const maxTiles = results.map((r) => r.maxTile);
-  return { results, scores, avg, min, max, median, totalMs, avgDecisionMs, maxTiles };
+  return {
+    results,
+    scores,
+    avg,
+    min,
+    max,
+    median,
+    totalMs,
+    avgDecisionMs,
+    maxTiles,
+  };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
@@ -122,13 +144,19 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     ? makeParamsForUsage(usageName, maxCells ? { MAX_CELLS: maxCells } : {})
     : makeParams(maxCells ? { MAX_CELLS: maxCells } : {});
   console.log(
-    `Running ${games} games, depth=${depth ?? "default(5)"}, usage=${usageName ?? "custom"}, maxCells=${P.MAX_CELLS}...`
+    `Running ${games} games, depth=${depth ?? "default(5)"}, usage=${usageName ?? "custom"}, maxCells=${P.MAX_CELLS}...`,
   );
   if (verbose) {
     for (let i = 0; i < games; i++) {
-      const r = playGame({ depth, P, seed: 1 + i, verbose: true, maxWallMs: 20000 });
+      const r = playGame({
+        depth,
+        P,
+        seed: 1 + i,
+        verbose: true,
+        maxWallMs: 20000,
+      });
       console.log(
-        `game ${i}: score=${r.score} maxTile=${r.maxTile} moves=${r.moves} aborted=${r.aborted} worstMoveMs=${r.worstMoveMs.toFixed(1)}`
+        `game ${i}: score=${r.score} maxTile=${r.maxTile} moves=${r.moves} aborted=${r.aborted} worstMoveMs=${r.worstMoveMs.toFixed(1)}`,
       );
     }
   } else {
@@ -137,7 +165,7 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log("maxTiles:", b.maxTiles);
     console.log(
       `avg=${b.avg.toFixed(0)} min=${b.min} max=${b.max} median=${b.median} ` +
-        `avgDecisionMs=${b.avgDecisionMs.toFixed(2)} totalMs=${b.totalMs.toFixed(0)}`
+        `avgDecisionMs=${b.avgDecisionMs.toFixed(2)} totalMs=${b.totalMs.toFixed(0)}`,
     );
   }
 }

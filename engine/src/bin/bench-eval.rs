@@ -1,4 +1,4 @@
-use engine2048::{EvalConfig, EvalMode, Engine};
+use engine2048::{Engine, EvalConfig, EvalMode};
 use std::time::Instant;
 
 const GRID_SIZES: &[usize] = &[3, 4, 5, 6, 8];
@@ -10,7 +10,9 @@ fn generate_test_board(n: usize, seed: u64) -> Vec<Vec<u32>> {
     let mut rng = seed;
     for r in 0..n {
         for c in 0..n {
-            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             if rng % 3 == 0 {
                 let val = 2u32 << ((rng >> 32) as u32 % 11);
                 board[r][c] = val;
@@ -40,7 +42,11 @@ fn benchmark_eval() {
             }
 
             let avg_us = total_time_ns as f64 / TEST_POSITIONS as f64 / 1000.0;
-            println!("  {:12}: avg {:.2}μs per position", format!("{:?}", mode), avg_us);
+            println!(
+                "  {:12}: avg {:.2}μs per position",
+                format!("{:?}", mode),
+                avg_us
+            );
         }
         println!();
     }
@@ -121,7 +127,9 @@ fn find_optimal_weights() {
         let mut rng = trial as u64;
 
         for w in trial_weights.iter_mut() {
-            rng = rng.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+            rng = rng
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
             let perturbation = ((rng as f64) / u64::MAX as f64 - 0.5) * 20.0;
             *w *= 1.0 + perturbation / 100.0;
         }

@@ -21,7 +21,12 @@ fn nibble(row: u16, col: usize) -> u16 {
 
 #[allow(dead_code)]
 fn compute_row_heur(row: u16) -> f32 {
-    let line = [nibble(row, 0), nibble(row, 1), nibble(row, 2), nibble(row, 3)];
+    let line = [
+        nibble(row, 0),
+        nibble(row, 1),
+        nibble(row, 2),
+        nibble(row, 3),
+    ];
 
     let mut sum = 0.0f64;
     let mut empty = 0.0f64;
@@ -93,7 +98,9 @@ fn transpose(board: Board4) -> Board4 {
 
 #[allow(dead_code)]
 fn score_rows(board: Board4, table: &[f32]) -> f64 {
-    (0..4).map(|r| table[get_row(board, r) as usize] as f64).sum()
+    (0..4)
+        .map(|r| table[get_row(board, r) as usize] as f64)
+        .sum()
 }
 
 #[allow(dead_code)]

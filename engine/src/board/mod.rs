@@ -79,8 +79,16 @@ mod fuzz_tests {
                     let gained = slide_bits_into(&flat, n, dir, &mut result)
                         .expect("bitboard path should handle power-of-two boards");
                     let expected_flat = Engine::flatten(&expected_grid);
-                    assert_eq!(result, expected_flat, "n={} dir {:?} grid {:?}", n, dir, grid);
-                    assert_eq!(gained, expected_gain, "n={} dir {:?} grid {:?}", n, dir, grid);
+                    assert_eq!(
+                        result, expected_flat,
+                        "n={} dir {:?} grid {:?}",
+                        n, dir, grid
+                    );
+                    assert_eq!(
+                        gained, expected_gain,
+                        "n={} dir {:?} grid {:?}",
+                        n, dir, grid
+                    );
                 }
             }
         }

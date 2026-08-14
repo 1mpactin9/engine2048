@@ -1,8 +1,8 @@
+use crate::board as bitboard_mod;
+use crate::{EvalConfig, EvalMode};
 use rand::Rng;
 use std::collections::VecDeque;
 use std::fmt;
-use crate::board as bitboard_mod;
-use crate::{EvalMode, EvalConfig};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Direction {
@@ -484,7 +484,12 @@ impl Engine {
         (result, gained)
     }
 
-    pub(crate) fn slide_flat_into(board: &[u32], n: usize, dir: Direction, result: &mut [u32]) -> u64 {
+    pub(crate) fn slide_flat_into(
+        board: &[u32],
+        n: usize,
+        dir: Direction,
+        result: &mut [u32],
+    ) -> u64 {
         if let Some(gained) = bitboard_mod::slide_bits_into(board, n, dir, result) {
             return gained;
         }
@@ -536,5 +541,4 @@ impl Engine {
         }
         gained
     }
-
 }

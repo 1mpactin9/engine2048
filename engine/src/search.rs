@@ -33,7 +33,7 @@ pub(crate) fn now_ms() -> f64 {
 
 use crate::board as bitboard_mod;
 use crate::transposition::{tt_get, tt_put, zobrist_hash};
-use crate::{Action, Direction, Engine, UsageMode, EvalMode, EvalConfig};
+use crate::{Action, Direction, Engine, EvalConfig, EvalMode, UsageMode};
 
 use std::cell::Cell;
 
@@ -206,7 +206,10 @@ impl Engine {
         Self::suggest_move_with_eval_for(grid, None, mode)
     }
 
-    pub fn suggest_move_with_eval_config(grid: &Vec<Vec<u32>>, config: &EvalConfig) -> Option<Direction> {
+    pub fn suggest_move_with_eval_config(
+        grid: &Vec<Vec<u32>>,
+        config: &EvalConfig,
+    ) -> Option<Direction> {
         let n = grid.len();
         let board = Self::flatten(grid);
 
@@ -229,7 +232,11 @@ impl Engine {
         best_dir
     }
 
-    pub fn compute_eval_result(board: &[u32], n: usize, config: &EvalConfig) -> crate::eval::EvalResult {
+    pub fn compute_eval_result(
+        board: &[u32],
+        n: usize,
+        config: &EvalConfig,
+    ) -> crate::eval::EvalResult {
         crate::eval::compute_eval_result(board, n, config)
     }
 
@@ -505,10 +512,12 @@ impl Engine {
         }
         total
     }
-
 }
 
-pub(crate) fn sampled_pairs(occ: &[(usize, usize)], max: usize) -> Vec<((usize, usize), (usize, usize))> {
+pub(crate) fn sampled_pairs(
+    occ: &[(usize, usize)],
+    max: usize,
+) -> Vec<((usize, usize), (usize, usize))> {
     let n = occ.len();
     if n < 2 || max == 0 {
         return Vec::new();

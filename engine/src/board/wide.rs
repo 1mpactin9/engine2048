@@ -104,7 +104,10 @@ fn slide_line_left(key: u64, n: usize) -> (u64, u32) {
 #[allow(dead_code)]
 impl WideBoard {
     pub fn empty(n: usize) -> Self {
-        WideBoard { n, rows: [0u64; MAX_SIDE] }
+        WideBoard {
+            n,
+            rows: [0u64; MAX_SIDE],
+        }
     }
 
     pub fn from_flat(board: &[u32], n: usize) -> Self {

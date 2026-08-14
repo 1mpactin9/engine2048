@@ -79,4 +79,4 @@ This project interacts with the following external open-source tools:
 
 &nbsp;
 
-> _If you are a *rights holder* and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly._
+> _If you are a **rights holder** and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly._

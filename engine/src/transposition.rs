@@ -19,8 +19,7 @@ const ZOBRIST_RANKS: usize = 32;
 pub fn set_tt_bits(bits: u32) {
     TT.with(|c| {
         if c.borrow().len() != (1usize << bits) {
-            *c.borrow_mut() =
-                vec![TTEntry::default(); 1usize << bits].into_boxed_slice();
+            *c.borrow_mut() = vec![TTEntry::default(); 1usize << bits].into_boxed_slice();
         }
     });
 }
