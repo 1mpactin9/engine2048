@@ -1,11 +1,29 @@
 use std::cell::RefCell;
 use std::sync::OnceLock;
 
-const TT_BITS: u32 = 20;
+/// Default transposition table size: 2^20 = 1 048 576 entries (~4 MB).
+/// Matches nneonneo's proven `unordered_map`-style cache at a reasonable
+/// memory footprint.  Override with [`set_tt_bits`] before any search
+/// call; the change applies to the next thread-local instance.
+pub const DEFAULT_TT_BITS: u32 = 20;
+const TT_BITS: u32 = DEFAULT_TT_BITS;
 const TT_SIZE: usize = 1 << TT_BITS;
 const TT_MASK: u64 = (TT_SIZE as u64) - 1;
 const ZOBRIST_CELLS: usize = 256;
 const ZOBRIST_RANKS: usize = 32;
+
+/// Rebuild the thread-local transposition table with a new size
+/// (must be a power of two, 2^`bits` entries).  Call before the first
+/// search; does nothing if the table has already been initialised on
+/// this thread.
+pub fn set_tt_bits(bits: u32) {
+    TT.with(|c| {
+        if c.borrow().len() != (1usize << bits) {
+            *c.borrow_mut() =
+                vec![TTEntry::default(); 1usize << bits].into_boxed_slice();
+        }
+    });
+}
 
 #[derive(Clone, Copy)]
 struct TTEntry {

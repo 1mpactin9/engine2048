@@ -1,17 +1,25 @@
 use super::bits4::Board4;
 use std::sync::OnceLock;
 
+#[allow(dead_code)]
 const MONOTONICITY_POWER: f64 = 4.0;
+#[allow(dead_code)]
 const MONOTONICITY_WEIGHT: f64 = 47.0;
+#[allow(dead_code)]
 const SUM_POWER: f64 = 3.5;
+#[allow(dead_code)]
 const SUM_WEIGHT: f64 = 11.0;
+#[allow(dead_code)]
 const MERGES_WEIGHT: f64 = 700.0;
+#[allow(dead_code)]
 const EMPTY_WEIGHT: f64 = 270.0;
 
+#[allow(dead_code)]
 fn nibble(row: u16, col: usize) -> u16 {
     (row >> (col * 4)) & 0xF
 }
 
+#[allow(dead_code)]
 fn compute_row_heur(row: u16) -> f32 {
     let line = [nibble(row, 0), nibble(row, 1), nibble(row, 2), nibble(row, 3)];
 
@@ -58,15 +66,18 @@ fn compute_row_heur(row: u16) -> f32 {
     score as f32
 }
 
+#[allow(dead_code)]
 fn row_heur_table() -> &'static Vec<f32> {
     static TABLE: OnceLock<Vec<f32>> = OnceLock::new();
     TABLE.get_or_init(|| (0..=u16::MAX).map(compute_row_heur).collect())
 }
 
+#[allow(dead_code)]
 fn get_row(board: Board4, row: usize) -> u16 {
     ((board >> (row * 16)) & 0xFFFF) as u16
 }
 
+#[allow(dead_code)]
 fn transpose(board: Board4) -> Board4 {
     let mut out: Board4 = 0;
     for r in 0..4 {
@@ -80,10 +91,12 @@ fn transpose(board: Board4) -> Board4 {
     out
 }
 
+#[allow(dead_code)]
 fn score_rows(board: Board4, table: &[f32]) -> f64 {
     (0..4).map(|r| table[get_row(board, r) as usize] as f64).sum()
 }
 
+#[allow(dead_code)]
 pub fn heur_score_board4(bits: Board4) -> f64 {
     let table = row_heur_table();
     score_rows(bits, table) + score_rows(transpose(bits), table)

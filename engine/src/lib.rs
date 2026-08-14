@@ -16,6 +16,7 @@ pub use usage::UsageMode;
 pub use deterministic::SeedRng;
 pub use eval::{EvalConfig, EvalMode, EvalResult, eval_cache_size, clear_eval_cache};
 pub use eval_tracker::EvalTracker;
+pub use transposition::set_tt_bits;
 
 #[cfg(test)]
 mod tests {
