@@ -117,9 +117,7 @@ describe("BoardRenderer — select mode", () => {
     const { board, teardown } = setup();
     board.setSize(4);
     board.fullRender(
-      [
-        [{ id: 1, value: 2 }, { id: 2, value: 4 }, null, null],
-      ] as never,
+      [[{ id: 1, value: 2 }, { id: 2, value: 4 }, null, null]] as never,
       false,
     );
     expect(board.isSelecting).toBe(false);

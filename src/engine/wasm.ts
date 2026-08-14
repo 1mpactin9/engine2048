@@ -1,4 +1,9 @@
-import type { AutoAction, Direction, Engine, EngineContext } from "../core/types";
+import type {
+  AutoAction,
+  Direction,
+  Engine,
+  EngineContext,
+} from "../core/types";
 import { PlaceholderEngine } from "./engine";
 import { usageModeToCode, DEFAULT_USAGE_MODE } from "../core/usage";
 

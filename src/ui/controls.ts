@@ -425,8 +425,7 @@ export class SettingsPopover {
     }
     if (opts.autoDepth !== undefined)
       this.depthSeg.setActive(String(opts.autoDepth));
-    if (opts.usageMode !== undefined)
-      this.usageSeg.setActive(opts.usageMode);
+    if (opts.usageMode !== undefined) this.usageSeg.setActive(opts.usageMode);
     if (opts.autoPowerups !== undefined) {
       this.powerupSwitch.classList.toggle("is-on", opts.autoPowerups);
       this.powerupSwitch.setAttribute(

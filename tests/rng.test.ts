@@ -58,8 +58,8 @@ describe("SecureRng stream position", () => {
   it("values at different positions are not equal", () => {
     const gen = new SecureRng(
       [
-        0xdeadc0de, 0xbeefcafe, 0x12345678, 0x9abcdef0, 0xfedcba98,
-        0x76543210, 0xdeadbeef, 0xcafebabe,
+        0xdeadc0de, 0xbeefcafe, 0x12345678, 0x9abcdef0, 0xfedcba98, 0x76543210,
+        0xdeadbeef, 0xcafebabe,
       ],
       0,
     );

@@ -48,9 +48,9 @@ describe("NotificationCenter", () => {
   it("close button marks card as leaving", () => {
     nc.show("Close me");
     const card = parent.querySelector(".notify-card")!;
-    card.querySelector(".notify-card__close")!.dispatchEvent(
-      new MouseEvent("click", { bubbles: true }),
-    );
+    card
+      .querySelector(".notify-card__close")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
     expect(card.classList.contains("is-leaving")).toBe(true);
   });
 });

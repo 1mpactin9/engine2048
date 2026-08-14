@@ -50,7 +50,9 @@ export function popIn(el: HTMLElement, opts: PopOptions = {}): void {
       ((peak - 1) * (t - 1) * (t - 1) * ((back + 1) * (t - 1) + back) +
         (t - 1) * (t - 1));
     const scale = 0.85 + (1 - 0.85) * eased;
-    el.style.opacity = String(fromOpacity + (1 - fromOpacity) * Math.min(1, t * 1.3));
+    el.style.opacity = String(
+      fromOpacity + (1 - fromOpacity) * Math.min(1, t * 1.3),
+    );
     el.style.transform = `scale(${Math.max(0.001, scale)})`;
     if (t < 1) requestAnimationFrame(tick);
   };
@@ -63,7 +65,11 @@ export interface SpringOptions {
   precision?: number;
 }
 
-export function spring(from: number, to: number, opts: SpringOptions = {}): {
+export function spring(
+  from: number,
+  to: number,
+  opts: SpringOptions = {},
+): {
   value(): number;
   done(): boolean;
   step(): number;
@@ -81,10 +87,7 @@ export function spring(from: number, to: number, opts: SpringOptions = {}): {
       const force = (to - value) * stiffness;
       velocity = (velocity + force) * damping;
       value += velocity;
-      if (
-        Math.abs(velocity) < precision &&
-        Math.abs(to - value) < precision
-      ) {
+      if (Math.abs(velocity) < precision && Math.abs(to - value) < precision) {
         value = to;
         velocity = 0;
         finished = true;

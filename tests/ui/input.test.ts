@@ -31,7 +31,9 @@ describe("Input — keyboard mapping", () => {
     };
     for (const [key, dir] of Object.entries(dirs)) {
       onMove.mockClear();
-      window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true }),
+      );
       expect(onMove).toHaveBeenCalledWith(dir);
     }
   });
@@ -47,27 +49,37 @@ describe("Input — keyboard mapping", () => {
     };
     for (const [key, dir] of Object.entries(map)) {
       onMove.mockClear();
-      window.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+      window.dispatchEvent(
+        new KeyboardEvent("keydown", { key, bubbles: true }),
+      );
       expect(onMove).toHaveBeenCalledWith(dir);
     }
   });
 
   it("U triggers undo and E triggers delete shortcut", () => {
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "u", bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "u", bubbles: true }),
+    );
     expect(onShortcut).toHaveBeenCalledWith("undo");
     onShortcut.mockClear();
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "e", bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "e", bubbles: true }),
+    );
     expect(onShortcut).toHaveBeenCalledWith("delete");
   });
 
   it("non-direction keys do not trigger onMove", () => {
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "x", bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "x", bubbles: true }),
+    );
     expect(onMove).not.toHaveBeenCalled();
   });
 
   it("destroy removes key listeners", () => {
     input.destroy();
-    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+    window.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }),
+    );
     expect(onMove).not.toHaveBeenCalled();
   });
 });

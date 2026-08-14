@@ -444,8 +444,7 @@ export class App {
 
   private updateUI(): void {
     const s = this.session.state;
-    const switched =
-      this.lastSize !== this.size || this.lastMode !== this.mode;
+    const switched = this.lastSize !== this.size || this.lastMode !== this.mode;
     let dir: "down" | "up" = "down";
     if (switched) {
       dir =
@@ -684,7 +683,9 @@ export class App {
     this.persist();
     this.popover.update({ deterministic: on });
     this.notify(
-      on ? "Deterministic Algorithm enabled" : "Deterministic Algorithm disabled",
+      on
+        ? "Deterministic Algorithm enabled"
+        : "Deterministic Algorithm disabled",
       Icons.dice,
     );
   }
@@ -948,7 +949,10 @@ export class App {
           }
           this.applyAutoAction(action);
           done++;
-          setTimeout(tick, usageProfile(this.data.settings.usageMode).tickDelayMs);
+          setTimeout(
+            tick,
+            usageProfile(this.data.settings.usageMode).tickDelayMs,
+          );
         })();
       };
       tick();
@@ -2051,7 +2055,11 @@ export class App {
       "dev.runAutoLoop(score)      Run AI until target score reached",
       "dev.help()                  Show this message",
     ];
-    console.log("%c2048 Developer Console%c", "font-weight:bold;font-size:14px;", "");
+    console.log(
+      "%c2048 Developer Console%c",
+      "font-weight:bold;font-size:14px;",
+      "",
+    );
     console.log("");
     for (const line of lines) console.log(line);
     console.log("");

@@ -131,7 +131,14 @@ describe("isFull / hasMoves", () => {
 
 describe("maxTile / hasTile", () => {
   it("maxTile returns the highest value, 0 for empty", () => {
-    expect(maxTile(gridFromValues([[2, 4], [16, 32]]))).toBe(32);
+    expect(
+      maxTile(
+        gridFromValues([
+          [2, 4],
+          [16, 32],
+        ]),
+      ),
+    ).toBe(32);
     expect(maxTile(createGrid(4))).toBe(0);
   });
 

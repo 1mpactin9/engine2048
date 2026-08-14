@@ -117,7 +117,10 @@ export function spawnTile(
     const cap = opts.usageMode
       ? usageProfile(opts.usageMode).manipulationRoundsCap
       : MANIPULATION_CANDIDATES_DEFAULT;
-    const rounds = Math.min(Math.max(cap, MANIPULATION_CANDIDATES_DEFAULT), empties.length);
+    const rounds = Math.min(
+      Math.max(cap, MANIPULATION_CANDIDATES_DEFAULT),
+      empties.length,
+    );
     let bestSpot = empties[0];
     let bestValue: number = opts.value ?? 2;
     let bestScore = -Infinity;

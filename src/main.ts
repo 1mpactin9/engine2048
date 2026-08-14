@@ -34,9 +34,7 @@ declare global {
             changed: boolean;
           }
         | undefined;
-      bypassValidation(
-        valueFirst?: boolean,
-      ):
+      bypassValidation(valueFirst?: boolean):
         | {
             feasible: boolean;
             removed: number;
