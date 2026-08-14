@@ -8,7 +8,7 @@
     "build:wasm": "wasm-pack build --target web --release engine",
     "build": "npm run build:wasm && tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "node scripts/test.cjs",
     "test:watch": "vitest"
   },
   "devDependencies": {

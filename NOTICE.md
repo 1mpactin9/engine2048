@@ -15,3 +15,7 @@ This software interacts with third-party components. The original licenses and c
 ### 3. ziap/2048-ai
 * **License:** MIT License
 * **Source:** [GitHub Repository](https://github.com/ziap/2048-ai)
+
+---
+
+> _If you are a *rights holder* and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly._

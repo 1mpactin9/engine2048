@@ -281,6 +281,7 @@ pub fn eval_tile_distribution(board: &[u32], _n: usize) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::heuristic::corner_reward_flat;
 
     #[test]
     fn empty_board_returns_nonzero_score() {
@@ -378,7 +379,6 @@ mod tests {
     }
 
     #[test]
-<<<<<<< HEAD
     fn monotony_zero_on_empty_board() {
         let board = vec![0u32; 16];
         assert_eq!(eval_monotony(&board, 4), 0.0);
@@ -408,15 +408,15 @@ mod tests {
     #[test]
     fn corner_preference_zero_on_small_board() {
         let board = vec![2u32, 0, 0, 4];
-        // n < 2 returns 0
-        assert_eq!(eval_corner_preference(&board, 1), 0.0);
+        // n=1 board: only one corner, score should be 0
+        assert_eq!(corner_reward_flat(&board, 1), 0.0);
     }
 
     #[test]
     fn corner_preference_positive_with_large_tile() {
         let mut board = vec![0u32; 16];
         board[0] = 4096; // largest tile in corner
-        let score = eval_corner_preference(&board, 4);
+        let score = corner_reward_flat(&board, 4);
         assert!(score > 0.0);
     }
 

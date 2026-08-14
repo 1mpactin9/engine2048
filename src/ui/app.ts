@@ -1930,7 +1930,7 @@ export class App {
           `  Games played: ${gamesPlayed}`,
           `  Final best: ${currentBest}`,
           `  Time: ${elapsed}s`,
-          `  Exceeded 3x threshold ✓`,
+          `  Exceeded 3x threshold`,
         );
         this.notify(
           `AFK High Score: ${currentBest} in ${elapsed}s`,

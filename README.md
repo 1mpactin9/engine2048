@@ -11,7 +11,7 @@
   <a href="https://github.com/1mpactin9/engine2048/actions"><img src="https://img.shields.io/github/actions/workflow/status/1mpactin9/engine2048/ci.yml" alt="Actions"></a>
 </div>
 
-A clean, responsive 2048 game built with TypeScript, Vite, and a Rust/WASM game engine. Still in progress, but works!
+A 2048 game built with TypeScript, Vite, and a Rust/WASM game engine. Still in progress, but works!
 
 ## Prerequisites
 
@@ -30,9 +30,9 @@ cargo install wasm-pack
 ## Build
 
 ```bash
-npm install          # dependencies
-npm run build        # run build
-npm run dev          # start dev
+npm install         # dependencies
+npm run build       # run build
+npm run dev         # start dev
 ```
 
 ## Verification
@@ -73,8 +73,10 @@ This project is licensed under the GNU General Public License v3.0.
 
 This project interacts with the following external open-source tools:
 
-- [ziap/2048-ai](https://github.com/ziap/2048-ai) - Licensed under MIT
-- [nneonneo/2048-ai](https://github.com/nneonneo/2048-ai) - Licensed under MIT
 - [game-difficulty/2048EndgameTablebase](https://github.com/game-difficulty/2048EndgameTablebase) - Licensed under GPL-3.0
+- [nneonneo/2048-ai](https://github.com/nneonneo/2048-ai) - Licensed under MIT
+- [ziap/2048-ai](https://github.com/ziap/2048-ai) - Licensed under MIT
 
-> If you are a rights holder and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly.
+&nbsp;
+
+> _If you are a *rights holder* and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly._
