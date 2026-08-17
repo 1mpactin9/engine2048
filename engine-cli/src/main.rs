@@ -26,6 +26,8 @@ struct App {
     game_state: GameState,
     swap_target: Option<(usize, usize)>,
     last_dir: Direction,
+    ai_delay: u64,
+    ai_paused: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -52,6 +54,8 @@ impl App {
             game_state: GameState::Playing,
             swap_target: None,
             last_dir: Direction::Up,
+            ai_delay: 100,
+            ai_paused: false,
         })
     }
 
@@ -134,9 +138,9 @@ impl App {
 
     fn draw_help(&self, writer: &mut impl Write) -> io::Result<()> {
         let help = match self.game_state {
-            GameState::Playing => " controls: ↑↓←→ move  s swap  x delete  u undo  p mode  q quit",
-            GameState::Won => " *** WON ***  r restart  s/x swap/delete  p mode  q quit",
-            GameState::Over => " *** GAME OVER ***  r restart  s/x swap/delete  p mode  q quit",
+            GameState::Playing => " controls: ↑↓←→ move  s swap  x delete  u undo  p mode  z pause/step  +-/ speed  q quit",
+            GameState::Won => " *** WON ***  r restart  s/x swap/delete  z pause/step  +-/ speed  p mode  q quit",
+            GameState::Over => " *** GAME OVER ***  r restart  s/x swap/delete  z pause/step  +-/ speed  p mode  q quit",
         };
         queue!(writer, crossterm::style::Print(help), crossterm::style::Print("\n"))
     }
@@ -199,6 +203,20 @@ impl App {
                     self.restart();
                 }
             }
+            KeyCode::Char('z') => {
+                if self.mode == GameMode::AI {
+                    self.ai_paused = !self.ai_paused;
+                    self.last_message = Some(if self.ai_paused { "paused" } else { "resumed" }.to_string());
+                }
+            }
+            KeyCode::Char('+') | KeyCode::Char('=') => {
+                self.ai_delay = self.ai_delay.saturating_sub(20).max(5);
+                self.last_message = Some(format!("speed: {}ms", self.ai_delay));
+            }
+            KeyCode::Char('-') => {
+                self.ai_delay = self.ai_delay.saturating_add(20);
+                self.last_message = Some(format!("speed: {}ms", self.ai_delay));
+            }
             KeyCode::Char('S') => {
                 // Shift+s for swap — select/confirm swap target
                 if self.game_state != GameState::Playing {
@@ -257,6 +275,7 @@ impl App {
             self.cursor = (0, 0);
             self.swap_target = None;
             self.game_state = GameState::Playing;
+            self.ai_paused = false;
             self.last_message = Some("restarted".to_string());
         }
     }
@@ -318,6 +337,37 @@ impl App {
         }
         Ok(())
     }
+
+    fn do_ai_step(&mut self) -> io::Result<()> {
+        if self.game_state != GameState::Playing {
+            return Ok(());
+        }
+        let dir = self.engine.suggest_move(Some(6)).unwrap_or(self.last_dir);
+        match self.engine.make_move(dir) {
+            Ok(outcome) => {
+                if outcome.moved {
+                    self.last_message = Some(format!(
+                        "ai {:?} (+{} pts)",
+                        dir, outcome.gained_score
+                    ));
+                    if outcome.won {
+                        self.game_state = GameState::Won;
+                        self.last_message =
+                            Some("*** YOU WON! ***".to_string());
+                    } else if outcome.game_over {
+                        self.game_state = GameState::Over;
+                        self.last_message =
+                            Some("*** GAME OVER ***".to_string());
+                    }
+                } else {
+                    self.game_state = GameState::Over;
+                    self.last_message = Some("*** GAME OVER ***".to_string());
+                }
+            }
+            Err(e) => self.last_message = Some(format!("{}", e)),
+        }
+        Ok(())
+    }
 }
 
 fn tile_to_style(tile: u32) -> (Color, String) {
@@ -344,11 +394,25 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
     queue!(stdout, EnterAlternateScreen)?;
 
     let mut app = App::new()?;
+    let mut ai_timer = std::time::Instant::now();
 
     while app.running {
         app.render(&mut stdout)?;
 
-        if event::poll(std::time::Duration::from_millis(50))? {
+        let wait = if app.mode == GameMode::AI && app.game_state == GameState::Playing && !app.ai_paused {
+            let delay = app.ai_delay;
+            if ai_timer.elapsed().as_millis() < delay as u128 {
+                Some(delay)
+            } else {
+                ai_timer = std::time::Instant::now();
+                app.do_ai_step()?;
+                None
+            }
+        } else {
+            None
+        };
+
+        if event::poll(std::time::Duration::from_millis(wait.unwrap_or(50)))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     app.handle_input(key.code)?;
