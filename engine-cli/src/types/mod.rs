@@ -63,3 +63,17 @@ pub fn tile_to_style(tile: u32) -> (Color, String) {
         _ => (Color::White, format!("{:>4}", tile)),
     }
 }
+
+pub const HISTORY_LEN: usize = 10;
+
+#[derive(Debug, Clone)]
+pub struct HistoryEntry {
+    pub dir: Direction,
+    pub gained: u64,
+}
+
+impl HistoryEntry {
+    pub fn to_string(&self) -> String {
+        format!("{} +{}", self.dir.label(), self.gained)
+    }
+}

@@ -1,7 +1,7 @@
 use engine2048::{Config, Engine, EvalMode};
 use std::io::{self, Write};
 
-use crate::types::{Direction, GameMode, GameState, GRID_SIZE};
+use crate::types::{Direction, GameMode, GameState, GRID_SIZE, HistoryEntry};
 
 use super::renderer::Renderer;
 
@@ -17,6 +17,7 @@ pub struct Game {
     pub ai_paused: bool,
     pub renderer: Renderer,
     pub eval_scores: [f64; 4],
+    pub history: Vec<HistoryEntry>,
 }
 
 impl Game {
@@ -39,6 +40,7 @@ impl Game {
             ai_delay: 100,
             ai_paused: false,
             eval_scores: [0.0; 4],
+            history: Vec::new(),
             renderer: Renderer::new(),
         })
     }
@@ -49,6 +51,7 @@ impl Game {
             let scores: [Option<f64>; 4] = self.eval_scores.map(|s| Some(s));
             self.renderer.set_eval_scores(scores);
         }
+        self.renderer.set_history(self.history.clone());
         self.renderer.set_mode(self.mode);
         self.renderer.set_game_state(self.game_state);
         self.renderer.set_swap_target(self.swap_target);
@@ -237,9 +240,17 @@ impl Game {
 
     fn handle_outcome(&mut self, outcome: engine2048::MoveOutcome) {
         if outcome.moved {
+            self.history.push(HistoryEntry {
+                dir: self.last_dir,
+                gained: outcome.gained_score,
+            });
+            let max = crate::types::HISTORY_LEN;
+            if self.history.len() > max {
+                self.history.drain(..self.history.len() - max);
+            }
             self.renderer.set_message(&format!(
                 "move {:?} (+{} pts)",
-                outcome.gained_score, outcome.gained_score
+                self.last_dir, outcome.gained_score
             ));
             if outcome.won {
                 self.game_state = GameState::Won;
@@ -271,6 +282,7 @@ impl Game {
             self.swap_target = None;
             self.game_state = GameState::Playing;
             self.ai_paused = false;
+            self.history.clear();
             self.renderer.set_message("restarted");
         }
     }

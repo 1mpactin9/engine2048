@@ -6,7 +6,7 @@ use crossterm::{
 use engine2048::Engine;
 use std::io::{self, Write};
 
-use crate::types::{Direction, GameMode, GameState, GRID_SIZE};
+use crate::types::{Direction, GameMode, GameState, GRID_SIZE, HistoryEntry};
 
 pub struct Renderer {
     last_message: Option<String>,
@@ -14,6 +14,7 @@ pub struct Renderer {
     game_state: GameState,
     swap_target: Option<(usize, usize)>,
     eval_scores: [Option<f64>; 4],
+    history: Vec<HistoryEntry>,
 }
 
 impl Renderer {
@@ -24,7 +25,12 @@ impl Renderer {
             game_state: GameState::Playing,
             swap_target: None,
             eval_scores: [None; 4],
+            history: Vec::new(),
         }
+    }
+
+    pub fn set_history(&mut self, history: Vec<HistoryEntry>) {
+        self.history = history;
     }
 
     pub fn set_eval_scores(&mut self, scores: [Option<f64>; 4]) {
@@ -59,12 +65,13 @@ impl Renderer {
         if self.mode == GameMode::Eval {
             self.draw_eval_legend(writer)?;
         }
+        self.draw_history(writer)?;
         self.draw_stats(writer, engine)?;
         self.draw_help(writer)?;
         if let Some(ref msg) = self.last_message {
             queue!(
                 writer,
-                cursor::MoveTo(0, 11),
+                cursor::MoveTo(0, 12),
                 Print(format!("{}", msg))
             )?;
         }
@@ -134,6 +141,30 @@ impl Renderer {
             )?;
         }
         queue!(writer, Print("\n"))
+    }
+
+    fn draw_history(&self, writer: &mut impl Write) -> io::Result<()> {
+        if self.history.is_empty() {
+            return Ok(());
+        }
+        queue!(
+            writer,
+            SetForegroundColor(Color::DarkGrey),
+            Print(" last moves:"),
+            ResetColor,
+            Print("\n")
+        )?;
+        for entry in self.history.iter().rev().take(5) {
+            queue!(
+                writer,
+                SetForegroundColor(Color::White),
+                Print("  "),
+                Print(entry.to_string()),
+                ResetColor,
+                Print("\n")
+            )?;
+        }
+        Ok(())
     }
 
     fn draw_tile(
