@@ -1,5 +1,6 @@
 use crossterm::style::Color;
 use std::fmt;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum GameMode {
@@ -20,6 +21,7 @@ pub enum Theme {
     Default,
     Dark,
     Ocean,
+    Mono,
 }
 
 impl Theme {
@@ -27,7 +29,19 @@ impl Theme {
         match self {
             Self::Default => Self::Dark,
             Self::Dark => Self::Ocean,
-            Self::Ocean => Self::Default,
+            Self::Ocean => Self::Mono,
+            Self::Mono => Self::Default,
+        }
+    }
+}
+
+impl Theme {
+    pub fn title(&self) -> Color {
+        match self {
+            Self::Default => Color::Cyan,
+            Self::Dark => Color::Yellow,
+            Self::Ocean => Color::Magenta,
+            Self::Mono => Color::White,
         }
     }
 
@@ -36,6 +50,7 @@ impl Theme {
             Self::Default => Color::Cyan,
             Self::Dark => Color::Yellow,
             Self::Ocean => Color::Magenta,
+            Self::Mono => Color::White,
         }
     }
 
@@ -44,12 +59,41 @@ impl Theme {
             Self::Default => Color::DarkGrey,
             Self::Dark => Color::Grey,
             Self::Ocean => Color::DarkCyan,
+            Self::Mono => Color::Grey,
+        }
+    }
+
+    pub fn muted(&self) -> Color {
+        match self {
+            Self::Default => Color::DarkGrey,
+            Self::Dark => Color::DarkGrey,
+            Self::Ocean => Color::DarkGrey,
+            Self::Mono => Color::DarkGrey,
+        }
+    }
+
+    pub fn win(&self) -> Color {
+        match self {
+            Self::Default => Color::Yellow,
+            Self::Dark => Color::Green,
+            Self::Ocean => Color::Cyan,
+            Self::Mono => Color::White,
+        }
+    }
+
+    pub fn lose(&self) -> Color {
+        match self {
+            Self::Default => Color::Red,
+            Self::Dark => Color::Red,
+            Self::Ocean => Color::Red,
+            Self::Mono => Color::White,
         }
     }
 }
 
 pub const HISTORY_LEN: usize = 20;
 pub const MAX_HISTORY_DISPLAY: usize = 8;
+pub const SAVE_PATH: &str = ".engine-cli-config.json";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -93,6 +137,68 @@ impl Direction {
             Self::Right => Color::Magenta,
         }
     }
+
+    pub fn opposite(self) -> Self {
+        match self {
+            Self::Up => Self::Down,
+            Self::Down => Self::Up,
+            Self::Left => Self::Right,
+            Self::Right => Self::Left,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Difficulty {
+    Casual,
+    Balanced,
+    Serious,
+    Godlike,
+}
+
+impl Difficulty {
+    pub const ALL: [Difficulty; 4] = [
+        Difficulty::Casual,
+        Difficulty::Balanced,
+        Difficulty::Serious,
+        Difficulty::Godlike,
+    ];
+
+    pub fn next(self) -> Self {
+        match self {
+            Self::Casual => Self::Balanced,
+            Self::Balanced => Self::Serious,
+            Self::Serious => Self::Godlike,
+            Self::Godlike => Self::Casual,
+        }
+    }
+
+    pub fn depth(&self) -> usize {
+        match self {
+            Self::Casual => 3,
+            Self::Balanced => 5,
+            Self::Serious => 7,
+            Self::Godlike => 9,
+        }
+    }
+
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Casual => "Casual",
+            Self::Balanced => "Balanced",
+            Self::Serious => "Serious",
+            Self::Godlike => "Godlike",
+        }
+    }
+
+    pub fn engine_depth(&self) -> Option<usize> {
+        match self {
+            Self::Casual => Some(2),
+            Self::Balanced => Some(4),
+            Self::Serious => Some(6),
+            Self::Godlike => Some(8),
+        }
+    }
 }
 
 pub fn tile_to_style(tile: u32) -> (Color, String) {
@@ -125,6 +231,25 @@ impl fmt::Display for HistoryEntry {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct MergeEvent {
+    pub tile: u32,
+    pub at: Instant,
+}
+
+impl MergeEvent {
+    pub fn fresh(tile: u32) -> Self {
+        Self {
+            tile,
+            at: Instant::now(),
+        }
+    }
+
+    pub fn is_fresh(&self) -> bool {
+        self.at.elapsed().as_millis() < 300
+    }
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct GameStats {
     pub total_moves: usize,
@@ -137,6 +262,13 @@ pub struct GameStats {
     pub undo_count: usize,
     pub swap_count: usize,
     pub delete_count: usize,
+    pub consecutive_merges: usize,
+    pub max_consecutive_merges: usize,
+    pub merges_this_game: usize,
+    pub milestone_1000: bool,
+    pub milestone_10000: bool,
+    pub milestone_50000: bool,
+    pub milestone_100000: bool,
 }
 
 impl GameStats {
@@ -146,6 +278,30 @@ impl GameStats {
         if max_tile > self.max_tile {
             self.max_tile = max_tile;
         }
+        if gained >= 1000 && !self.milestone_1000 {
+            self.milestone_1000 = true;
+        }
+        if self.total_score >= 10000 && !self.milestone_10000 {
+            self.milestone_10000 = true;
+        }
+        if self.total_score >= 50000 && !self.milestone_50000 {
+            self.milestone_50000 = true;
+        }
+        if self.total_score >= 100000 && !self.milestone_100000 {
+            self.milestone_100000 = true;
+        }
+    }
+
+    pub fn record_merge(&mut self, _tile: u32) {
+        self.merges_this_game += 1;
+        self.consecutive_merges += 1;
+        if self.consecutive_merges > self.max_consecutive_merges {
+            self.max_consecutive_merges = self.consecutive_merges;
+        }
+    }
+
+    pub fn reset_move_streak(&mut self) {
+        self.consecutive_merges = 0;
     }
 
     pub fn end_game(&mut self, won: bool) {
@@ -155,15 +311,37 @@ impl GameStats {
             self.games_over += 1;
         }
     }
+
+    pub fn win_rate(&self) -> f64 {
+        let total = self.games_won + self.games_over;
+        if total == 0 {
+            0.0
+        } else {
+            self.games_won as f64 / total as f64 * 100.0
+        }
+    }
+
+    pub fn avg_score(&self) -> f64 {
+        let total = self.games_won + self.games_over;
+        if total == 0 {
+            0.0
+        } else {
+            self.total_score as f64 / total as f64
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
 pub struct GameConfig {
     pub board_size: usize,
     pub theme: Theme,
+    pub difficulty: Difficulty,
     pub show_eval: bool,
     pub show_history: bool,
     pub show_stats: bool,
+    pub show_animations: bool,
+    pub target_tile: u32,
+    pub powerup_charges: u32,
 }
 
 impl Default for GameConfig {
@@ -171,9 +349,20 @@ impl Default for GameConfig {
         Self {
             board_size: 4,
             theme: Theme::Default,
+            difficulty: Difficulty::Balanced,
             show_eval: false,
             show_history: true,
             show_stats: true,
+            show_animations: true,
+            target_tile: 2048,
+            powerup_charges: 3,
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Screen {
+    Main,
+    Welcome,
+    GameOver,
 }

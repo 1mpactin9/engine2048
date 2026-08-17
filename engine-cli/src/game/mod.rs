@@ -24,6 +24,7 @@ pub struct Game {
     pub move_count: usize,
     pub session_score: u64,
     pub session_max_tile: u32,
+    pub session_merges: usize,
 }
 
 impl Game {
@@ -31,8 +32,9 @@ impl Game {
         let config = GameConfig::default();
         let engine = Engine::new(Config {
             size: config.board_size,
-            swap_charges: 3,
-            delete_charges: 3,
+            swap_charges: config.powerup_charges,
+            delete_charges: config.powerup_charges,
+            target_tile: config.target_tile,
             ..Config::default()
         })
         .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
@@ -54,10 +56,12 @@ impl Game {
             move_count: 0,
             session_score: 0,
             session_max_tile: 0,
+            session_merges: 0,
         })
     }
 
     pub fn render(&mut self, writer: &mut impl Write) -> io::Result<()> {
+        self.renderer.advance_frame();
         if self.mode == GameMode::Eval {
             self.compute_eval_scores();
             let scores: [Option<f64>; 4] = self.eval_scores.map(|s| Some(s));
@@ -72,6 +76,7 @@ impl Game {
             .set_move_count(self.move_count + self.history.len());
         self.renderer
             .set_game_score(self.session_score + self.engine.score());
+        self.renderer.target_tile = self.config.target_tile;
         self.renderer.render(writer, &self.engine, self.cursor)
     }
 
@@ -91,6 +96,9 @@ impl Game {
             KeyCode::Char('t') => {
                 self.renderer.next_theme();
             }
+            KeyCode::Char('d') if !matches!(key, KeyCode::Right) => {
+                self.renderer.next_difficulty();
+            }
             KeyCode::Char('e') => {
                 self.renderer.toggle_eval();
             }
@@ -98,7 +106,6 @@ impl Game {
                 self.renderer.toggle_history();
             }
             KeyCode::Char('s') if self.swap_target.is_some() => {
-                // shift+s is handled below; lowercase 's' when swap is active = move down
                 self.last_dir = Direction::Down;
                 self.move_cursor(1, 0);
                 if self.game_state == GameState::Playing {
@@ -128,14 +135,14 @@ impl Game {
                     self.do_move(Direction::Down)?;
                 }
             }
-            KeyCode::Left | KeyCode::Char('a') => {
+            KeyCode::Left => {
                 self.last_dir = Direction::Left;
                 self.move_cursor(0, -1);
                 if self.game_state == GameState::Playing && self.swap_target.is_none() {
                     self.do_move(Direction::Left)?;
                 }
             }
-            KeyCode::Right | KeyCode::Char('d') => {
+            KeyCode::Right => {
                 self.last_dir = Direction::Right;
                 self.move_cursor(0, 1);
                 if self.game_state == GameState::Playing && self.swap_target.is_none() {
@@ -163,7 +170,6 @@ impl Game {
                 self.renderer.set_message(&format!("speed: {}ms", self.ai_delay));
             }
             KeyCode::Char('S') => {
-                // uppercase S = swap power-up
                 if self.game_state != GameState::Playing {
                     return Ok(());
                 }
@@ -185,7 +191,7 @@ impl Game {
                     _ => {
                         self.swap_target = Some((sr, sc));
                         self.renderer
-                            .set_message("swap target selected — move to other tile");
+                            .set_message("swap target — move to other tile");
                     }
                 }
             }
@@ -206,8 +212,9 @@ impl Game {
                 if let Some(size) = key_to_size(key) {
                     if let Ok(e) = Engine::new(Config {
                         size,
-                        swap_charges: 3,
-                        delete_charges: 3,
+                        swap_charges: self.config.powerup_charges,
+                        delete_charges: self.config.powerup_charges,
+                        target_tile: self.config.target_tile,
                         ..Config::default()
                     }) {
                         self.engine = e;
@@ -219,10 +226,16 @@ impl Game {
                         self.move_count = 0;
                         self.session_score = 0;
                         self.session_max_tile = 0;
+                        self.session_merges = 0;
                         self.config.board_size = size;
-                        self.renderer.set_message(&format!("size: {}x{}", size, size));
+                        self.renderer.show_welcome();
+                        self.renderer
+                            .set_message(&format!("size: {}x{}", size, size));
                     }
                 }
+            }
+            KeyCode::Char('a') if self.config.show_eval => {
+                self.renderer.toggle_animations();
             }
             _ => {}
         }
@@ -237,9 +250,14 @@ impl Game {
                 Err(e) => self.renderer.set_message(&format!("{}", e)),
             },
             GameMode::AI => {
+                let depth = self
+                    .config
+                    .difficulty
+                    .engine_depth()
+                    .unwrap_or(6);
                 let dir = self
                     .engine
-                    .suggest_move(Some(6))
+                    .suggest_move(Some(depth))
                     .unwrap_or(engine_dir);
                 match self.engine.make_move(dir) {
                     Ok(outcome) => self.handle_outcome(outcome),
@@ -261,9 +279,14 @@ impl Game {
         if self.game_state != GameState::Playing {
             return Ok(());
         }
+        let depth = self
+            .config
+            .difficulty
+            .engine_depth()
+            .unwrap_or(6);
         let dir = self
             .engine
-            .suggest_move(Some(6))
+            .suggest_move(Some(depth))
             .unwrap_or(self.last_dir.to_engine());
         match self.engine.make_move(dir) {
             Ok(outcome) => self.handle_outcome(outcome),
@@ -279,6 +302,7 @@ impl Game {
                 size: self.config.board_size,
                 swap_charges: 0,
                 delete_charges: 0,
+                target_tile: self.config.target_tile,
                 ..Config::default()
             }) {
                 Ok(e) => e,
@@ -330,6 +354,13 @@ impl Game {
             if outcome.gained_score > self.stats.best_score {
                 self.stats.best_score = outcome.gained_score;
             }
+            if outcome.gained_score > 0 {
+                self.stats.record_merge(outcome.gained_score as u32);
+                self.session_merges += 1;
+                self.renderer.record_merge(outcome.gained_score as u32);
+            } else {
+                self.stats.reset_move_streak();
+            }
             self.renderer.set_message(&format!(
                 "{} +{}",
                 self.last_dir.label(),
@@ -338,11 +369,16 @@ impl Game {
             if outcome.won {
                 self.game_state = GameState::Won;
                 self.stats.end_game(true);
-                self.renderer.set_message("*** YOU WON! ***");
+                self.renderer.set_message(&format!(
+                    "*** YOU REACHED {}! ***",
+                    self.config.target_tile
+                ));
+                self.renderer.show_game_over();
             } else if outcome.game_over {
                 self.game_state = GameState::Over;
                 self.stats.end_game(false);
                 self.renderer.set_message("*** GAME OVER ***");
+                self.renderer.show_game_over();
             }
         } else {
             self.renderer.set_message("no move");
@@ -360,8 +396,9 @@ impl Game {
         let size = self.config.board_size;
         if let Ok(e) = Engine::new(Config {
             size,
-            swap_charges: 3,
-            delete_charges: 3,
+            swap_charges: self.config.powerup_charges,
+            delete_charges: self.config.powerup_charges,
+            target_tile: self.config.target_tile,
             ..Config::default()
         }) {
             self.engine = e;
@@ -372,6 +409,9 @@ impl Game {
             self.history.clear();
             self.move_count = 0;
             self.session_score = 0;
+            self.session_max_tile = 0;
+            self.session_merges = 0;
+            self.renderer.show_welcome();
             self.renderer.set_message("restarted");
         }
     }
