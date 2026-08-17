@@ -2,18 +2,18 @@ use crossterm::{
     cursor,
     queue,
     style::{Color, Print, ResetColor, SetForegroundColor},
-    terminal::ClearType,
 };
 use engine2048::Engine;
 use std::io::{self, Write};
 
-use crate::types::{GameMode, GameState, GRID_SIZE};
+use crate::types::{Direction, GameMode, GameState, GRID_SIZE};
 
 pub struct Renderer {
     last_message: Option<String>,
     mode: GameMode,
     game_state: GameState,
     swap_target: Option<(usize, usize)>,
+    eval_scores: [Option<f64>; 4],
 }
 
 impl Renderer {
@@ -23,7 +23,12 @@ impl Renderer {
             mode: GameMode::Play,
             game_state: GameState::Playing,
             swap_target: None,
+            eval_scores: [None; 4],
         }
+    }
+
+    pub fn set_eval_scores(&mut self, scores: [Option<f64>; 4]) {
+        self.eval_scores = scores;
     }
 
     pub fn set_message(&mut self, msg: &str) {
@@ -48,15 +53,18 @@ impl Renderer {
         engine: &Engine,
         cursor_pos: (usize, usize),
     ) -> io::Result<()> {
-        queue!(writer, crossterm::terminal::Clear(ClearType::All))?;
+        queue!(writer, crossterm::terminal::Clear(crossterm::terminal::ClearType::All))?;
         self.draw_title(writer, engine)?;
         self.draw_board(writer, engine, cursor_pos)?;
+        if self.mode == GameMode::Eval {
+            self.draw_eval_legend(writer)?;
+        }
         self.draw_stats(writer, engine)?;
         self.draw_help(writer)?;
         if let Some(ref msg) = self.last_message {
             queue!(
                 writer,
-                cursor::MoveTo(0, 10),
+                cursor::MoveTo(0, 11),
                 Print(format!("{}", msg))
             )?;
         }
@@ -101,6 +109,31 @@ impl Renderer {
             queue!(writer, Print("\n"))?;
         }
         Ok(())
+    }
+
+    fn draw_eval_legend(&self, writer: &mut impl Write) -> io::Result<()> {
+        let dirs = [
+            (Direction::Up, Color::Cyan),
+            (Direction::Down, Color::Yellow),
+            (Direction::Left, Color::Green),
+            (Direction::Right, Color::Magenta),
+        ];
+        for (i, (dir, color)) in dirs.iter().enumerate() {
+            let label = match self.eval_scores[i] {
+                Some(s) if s.is_nan() => "---".to_string(),
+                Some(s) => format!("{:7.1}", s),
+                None => "  invalid".to_string(),
+            };
+            queue!(
+                writer,
+                SetForegroundColor(*color),
+                Print(format!(" {}: ", dir.label())),
+                ResetColor,
+                Print(label),
+                Print("  ")
+            )?;
+        }
+        queue!(writer, Print("\n"))
     }
 
     fn draw_tile(

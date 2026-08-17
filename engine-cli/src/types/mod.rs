@@ -33,6 +33,17 @@ impl Direction {
             Self::Right => engine2048::Direction::Right,
         }
     }
+
+    pub const ALL: [Direction; 4] = [Direction::Up, Direction::Down, Direction::Left, Direction::Right];
+
+    pub fn label(&self) -> &str {
+        match self {
+            Self::Up => "↑",
+            Self::Down => "↓",
+            Self::Left => "←",
+            Self::Right => "→",
+        }
+    }
 }
 
 pub fn tile_to_style(tile: u32) -> (Color, String) {

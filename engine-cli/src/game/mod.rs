@@ -16,6 +16,7 @@ pub struct Game {
     pub ai_delay: u64,
     pub ai_paused: bool,
     pub renderer: Renderer,
+    pub eval_scores: [f64; 4],
 }
 
 impl Game {
@@ -37,11 +38,17 @@ impl Game {
             last_dir: Direction::Up,
             ai_delay: 100,
             ai_paused: false,
+            eval_scores: [0.0; 4],
             renderer: Renderer::new(),
         })
     }
 
     pub fn render(&mut self, writer: &mut impl Write) -> io::Result<()> {
+        if self.mode == GameMode::Eval {
+            self.compute_eval_scores();
+            let scores: [Option<f64>; 4] = self.eval_scores.map(|s| Some(s));
+            self.renderer.set_eval_scores(scores);
+        }
         self.renderer.set_mode(self.mode);
         self.renderer.set_game_state(self.game_state);
         self.renderer.set_swap_target(self.swap_target);
@@ -198,6 +205,34 @@ impl Game {
             Err(e) => self.renderer.set_message(&format!("{}", e)),
         }
         Ok(())
+    }
+
+    pub fn compute_eval_scores(&mut self) {
+        let base_grid = self.engine.grid().clone();
+        for (i, &dir) in Direction::ALL.iter().enumerate() {
+            let mut sim = match Engine::new(Config {
+                size: GRID_SIZE,
+                swap_charges: 0,
+                delete_charges: 0,
+                ..Config::default()
+            }) {
+                Ok(e) => e,
+                Err(_) => {
+                    self.eval_scores[i] = f64::NEG_INFINITY;
+                    continue;
+                }
+            };
+            sim.set_grid(base_grid.clone());
+            match sim.make_move(dir.to_engine()) {
+                Ok(outcome) if outcome.moved => {
+                    let result = sim.evaluate_position(EvalMode::Balanced);
+                    self.eval_scores[i] = result.score;
+                }
+                _ => {
+                    self.eval_scores[i] = f64::NEG_INFINITY;
+                }
+            }
+        }
     }
 
     fn handle_outcome(&mut self, outcome: engine2048::MoveOutcome) {
