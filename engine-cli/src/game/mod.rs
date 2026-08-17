@@ -1,7 +1,8 @@
+use crossterm::event::KeyCode;
 use engine2048::{Config, Engine, EvalMode};
 use std::io::{self, Write};
 
-use crate::types::{Direction, GameMode, GameState, GRID_SIZE, HistoryEntry};
+use crate::types::{Direction, GameConfig, GameMode, GameState, GameStats, HISTORY_LEN, HistoryEntry};
 
 use super::renderer::Renderer;
 
@@ -18,12 +19,18 @@ pub struct Game {
     pub renderer: Renderer,
     pub eval_scores: [f64; 4],
     pub history: Vec<HistoryEntry>,
+    pub config: GameConfig,
+    pub stats: GameStats,
+    pub move_count: usize,
+    pub session_score: u64,
+    pub session_max_tile: u32,
 }
 
 impl Game {
     pub fn new() -> io::Result<Self> {
+        let config = GameConfig::default();
         let engine = Engine::new(Config {
-            size: GRID_SIZE,
+            size: config.board_size,
             swap_charges: 3,
             delete_charges: 3,
             ..Config::default()
@@ -39,9 +46,14 @@ impl Game {
             last_dir: Direction::Up,
             ai_delay: 100,
             ai_paused: false,
+            renderer: Renderer::new(config.clone()),
             eval_scores: [0.0; 4],
             history: Vec::new(),
-            renderer: Renderer::new(),
+            config,
+            stats: GameStats::default(),
+            move_count: 0,
+            session_score: 0,
+            session_max_tile: 0,
         })
     }
 
@@ -55,11 +67,15 @@ impl Game {
         self.renderer.set_mode(self.mode);
         self.renderer.set_game_state(self.game_state);
         self.renderer.set_swap_target(self.swap_target);
+        self.renderer.set_config(self.config.clone());
+        self.renderer
+            .set_move_count(self.move_count + self.history.len());
+        self.renderer
+            .set_game_score(self.session_score + self.engine.score());
         self.renderer.render(writer, &self.engine, self.cursor)
     }
 
-    pub fn handle_input(&mut self, key: crossterm::event::KeyCode) -> io::Result<()> {
-        use crossterm::event::KeyCode;
+    pub fn handle_input(&mut self, key: KeyCode) -> io::Result<()> {
         match key {
             KeyCode::Char('q') | KeyCode::Esc => {
                 self.running = false;
@@ -70,12 +86,31 @@ impl Game {
                     GameMode::AI => GameMode::Eval,
                     GameMode::Eval => GameMode::Play,
                 };
-                self.renderer
-                    .set_message(&format!("mode: {:?}", self.mode));
+                self.renderer.set_message(&format!("mode: {:?}", self.mode));
+            }
+            KeyCode::Char('t') => {
+                self.renderer.next_theme();
+            }
+            KeyCode::Char('e') => {
+                self.renderer.toggle_eval();
+            }
+            KeyCode::Char('h') => {
+                self.renderer.toggle_history();
+            }
+            KeyCode::Char('s') if self.swap_target.is_some() => {
+                // shift+s is handled below; lowercase 's' when swap is active = move down
+                self.last_dir = Direction::Down;
+                self.move_cursor(1, 0);
+                if self.game_state == GameState::Playing {
+                    self.do_move(Direction::Down)?;
+                }
             }
             KeyCode::Char('u') => {
                 match self.engine.undo() {
-                    Ok(()) => self.renderer.set_message("undone"),
+                    Ok(()) => {
+                        self.renderer.set_message("undone");
+                        self.renderer.record_undo();
+                    }
                     Err(e) => self.renderer.set_message(&format!("{}", e)),
                 }
             }
@@ -89,7 +124,7 @@ impl Game {
             KeyCode::Down | KeyCode::Char('s') => {
                 self.last_dir = Direction::Down;
                 self.move_cursor(1, 0);
-                if self.swap_target.is_some() && self.game_state == GameState::Playing {
+                if self.game_state == GameState::Playing && self.swap_target.is_none() {
                     self.do_move(Direction::Down)?;
                 }
             }
@@ -128,6 +163,7 @@ impl Game {
                 self.renderer.set_message(&format!("speed: {}ms", self.ai_delay));
             }
             KeyCode::Char('S') => {
+                // uppercase S = swap power-up
                 if self.game_state != GameState::Playing {
                     return Ok(());
                 }
@@ -138,6 +174,7 @@ impl Game {
                             Ok(()) => {
                                 self.swap_target = None;
                                 self.renderer.set_message("swapped");
+                                self.renderer.record_powerup("swap");
                             }
                             Err(e) => {
                                 self.swap_target = None;
@@ -158,8 +195,33 @@ impl Game {
                 }
                 let (r, c) = self.cursor;
                 match self.engine.delete_tile((r, c)) {
-                    Ok(()) => self.renderer.set_message("deleted"),
+                    Ok(()) => {
+                        self.renderer.set_message("deleted");
+                        self.renderer.record_powerup("delete");
+                    }
                     Err(e) => self.renderer.set_message(&format!("{}", e)),
+                }
+            }
+            KeyCode::Char('1') | KeyCode::Char('2') | KeyCode::Char('3') => {
+                if let Some(size) = key_to_size(key) {
+                    if let Ok(e) = Engine::new(Config {
+                        size,
+                        swap_charges: 3,
+                        delete_charges: 3,
+                        ..Config::default()
+                    }) {
+                        self.engine = e;
+                        self.cursor = (0, 0);
+                        self.swap_target = None;
+                        self.game_state = GameState::Playing;
+                        self.ai_paused = false;
+                        self.history.clear();
+                        self.move_count = 0;
+                        self.session_score = 0;
+                        self.session_max_tile = 0;
+                        self.config.board_size = size;
+                        self.renderer.set_message(&format!("size: {}x{}", size, size));
+                    }
                 }
             }
             _ => {}
@@ -214,7 +276,7 @@ impl Game {
         let base_grid = self.engine.grid().clone();
         for (i, &dir) in Direction::ALL.iter().enumerate() {
             let mut sim = match Engine::new(Config {
-                size: GRID_SIZE,
+                size: self.config.board_size,
                 swap_charges: 0,
                 delete_charges: 0,
                 ..Config::default()
@@ -240,23 +302,46 @@ impl Game {
 
     fn handle_outcome(&mut self, outcome: engine2048::MoveOutcome) {
         if outcome.moved {
+            let max_tile = self
+                .engine
+                .grid()
+                .iter()
+                .flatten()
+                .copied()
+                .max()
+                .unwrap_or(0);
             self.history.push(HistoryEntry {
                 dir: self.last_dir,
                 gained: outcome.gained_score,
             });
-            let max = crate::types::HISTORY_LEN;
+            let max = HISTORY_LEN;
             if self.history.len() > max {
                 self.history.drain(..self.history.len() - max);
             }
+            self.move_count += 1;
+            self.session_score += outcome.gained_score;
+            if max_tile > self.session_max_tile {
+                self.session_max_tile = max_tile;
+            }
+            self.stats.record_move(outcome.gained_score, max_tile);
+            if max_tile > self.stats.max_tile {
+                self.stats.max_tile = max_tile;
+            }
+            if outcome.gained_score > self.stats.best_score {
+                self.stats.best_score = outcome.gained_score;
+            }
             self.renderer.set_message(&format!(
-                "move {:?} (+{} pts)",
-                self.last_dir, outcome.gained_score
+                "{} +{}",
+                self.last_dir.label(),
+                outcome.gained_score
             ));
             if outcome.won {
                 self.game_state = GameState::Won;
+                self.stats.end_game(true);
                 self.renderer.set_message("*** YOU WON! ***");
             } else if outcome.game_over {
                 self.game_state = GameState::Over;
+                self.stats.end_game(false);
                 self.renderer.set_message("*** GAME OVER ***");
             }
         } else {
@@ -265,14 +350,16 @@ impl Game {
     }
 
     fn move_cursor(&mut self, dr: isize, dc: isize) {
-        let r = (self.cursor.0 as isize + dr).clamp(0, GRID_SIZE as isize - 1) as usize;
-        let c = (self.cursor.1 as isize + dc).clamp(0, GRID_SIZE as isize - 1) as usize;
+        let size = self.config.board_size;
+        let r = (self.cursor.0 as isize + dr).clamp(0, size as isize - 1) as usize;
+        let c = (self.cursor.1 as isize + dc).clamp(0, size as isize - 1) as usize;
         self.cursor = (r, c);
     }
 
     fn restart(&mut self) {
+        let size = self.config.board_size;
         if let Ok(e) = Engine::new(Config {
-            size: GRID_SIZE,
+            size,
             swap_charges: 3,
             delete_charges: 3,
             ..Config::default()
@@ -283,7 +370,18 @@ impl Game {
             self.game_state = GameState::Playing;
             self.ai_paused = false;
             self.history.clear();
+            self.move_count = 0;
+            self.session_score = 0;
             self.renderer.set_message("restarted");
         }
+    }
+}
+
+fn key_to_size(key: KeyCode) -> Option<usize> {
+    match key {
+        KeyCode::Char('1') => Some(3),
+        KeyCode::Char('2') => Some(4),
+        KeyCode::Char('3') => Some(5),
+        _ => None,
     }
 }
