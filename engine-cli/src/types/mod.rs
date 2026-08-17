@@ -36,6 +36,7 @@ impl Theme {
 }
 
 impl Theme {
+    #[allow(dead_code)]
     pub fn title(&self) -> Color {
         match self {
             Self::Default => Color::Cyan,
@@ -63,6 +64,7 @@ impl Theme {
         }
     }
 
+    #[allow(dead_code)]
     pub fn muted(&self) -> Color {
         match self {
             Self::Default => Color::DarkGrey,
@@ -93,7 +95,8 @@ impl Theme {
 
 pub const HISTORY_LEN: usize = 20;
 pub const MAX_HISTORY_DISPLAY: usize = 8;
-pub const SAVE_PATH: &str = ".engine-cli-config.json";
+pub const SAVE_PATH: &str = ".engine-cli-save.json";
+pub const REPLAY_PATH: &str = ".engine-cli-replay.json";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Direction {
@@ -138,6 +141,7 @@ impl Direction {
         }
     }
 
+    #[allow(dead_code)]
     pub fn opposite(self) -> Self {
         match self {
             Self::Up => Self::Down,
@@ -157,6 +161,7 @@ pub enum Difficulty {
 }
 
 impl Difficulty {
+    #[allow(dead_code)]
     pub const ALL: [Difficulty; 4] = [
         Difficulty::Casual,
         Difficulty::Balanced,
@@ -173,6 +178,7 @@ impl Difficulty {
         }
     }
 
+    #[allow(dead_code)]
     pub fn depth(&self) -> usize {
         match self {
             Self::Casual => 3,
@@ -344,6 +350,21 @@ pub struct GameConfig {
     pub powerup_charges: u32,
 }
 
+impl GameConfig {
+    #[allow(dead_code)]
+    pub fn persist(&self) {
+        use std::fs::File;
+        use std::io::Write;
+        let json = format!(
+            "{{\"size\":{},\"theme\":\"{:?}\",\"difficulty\":\"{:?}\",\"eval\":{},\"history\":{},\"stats\":{},\"animations\":{},\"target\":{},\"charges\":{}}}",
+            self.board_size, self.theme, self.difficulty, self.show_eval, self.show_history, self.show_stats, self.show_animations, self.target_tile, self.powerup_charges,
+        );
+        if let Ok(mut f) = File::create(SAVE_PATH) {
+            let _ = f.write_all(json.as_bytes());
+        }
+    }
+}
+
 impl Default for GameConfig {
     fn default() -> Self {
         Self {
@@ -362,7 +383,50 @@ impl Default for GameConfig {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Screen {
+    #[allow(dead_code)]
     Main,
     Welcome,
     GameOver,
+}
+
+#[derive(Debug, Clone)]
+pub struct SavedGame {
+    pub grid: Vec<Vec<u32>>,
+    pub score: u64,
+    pub won: bool,
+    pub over: bool,
+    pub swaps_left: u32,
+    pub deletes_left: u32,
+    pub move_count: usize,
+}
+
+#[derive(Debug, Clone)]
+pub struct TournamentConfig {
+    pub games_per_run: usize,
+    #[allow(dead_code)]
+    pub size: usize,
+    #[allow(dead_code)]
+    pub difficulty: Difficulty,
+}
+
+impl Default for TournamentConfig {
+    fn default() -> Self {
+        Self {
+            games_per_run: 10,
+            size: 4,
+            difficulty: Difficulty::Balanced,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ReplayEntry {
+    #[allow(dead_code)]
+    pub grid: Vec<Vec<u32>>,
+    #[allow(dead_code)]
+    pub score: u64,
+    #[allow(dead_code)]
+    pub dir: Direction,
+    #[allow(dead_code)]
+    pub gained: u64,
 }

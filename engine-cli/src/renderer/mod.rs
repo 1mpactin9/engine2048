@@ -9,7 +9,7 @@ use std::io::{self, Write};
 
 use crate::types::{
     Direction, GameConfig, GameMode, GameState, GameStats, HistoryEntry, MergeEvent,
-    Screen, HISTORY_LEN, MAX_HISTORY_DISPLAY,
+    Screen, TournamentConfig, HISTORY_LEN, MAX_HISTORY_DISPLAY,
 };
 
 pub struct Renderer {
@@ -29,6 +29,9 @@ pub struct Renderer {
     pub target_tile: u32,
     pub ai_paused: bool,
     pub ai_delay: u64,
+    pub recording: bool,
+    pub tournament_wins: usize,
+    pub tournament_config: TournamentConfig,
 }
 
 impl Renderer {
@@ -50,6 +53,9 @@ impl Renderer {
             target_tile: 2048,
             ai_paused: false,
             ai_delay: 100,
+            recording: false,
+            tournament_wins: 0,
+            tournament_config: TournamentConfig::default(),
         }
     }
 
@@ -132,6 +138,7 @@ impl Renderer {
         self.config.show_history = !self.config.show_history;
     }
 
+    #[allow(dead_code)]
     pub fn toggle_stats(&mut self) {
         self.config.show_stats = !self.config.show_stats;
     }
@@ -148,8 +155,21 @@ impl Renderer {
         self.screen = Screen::Welcome;
     }
 
+    #[allow(dead_code)]
     pub fn hide_overlay(&mut self) {
         self.screen = Screen::Main;
+    }
+
+    pub fn show_replay(&mut self, on: bool) {
+        self.recording = on;
+    }
+
+    pub fn set_tournament_wins(&mut self, wins: usize) {
+        self.tournament_wins = wins;
+    }
+
+    pub fn set_tournament_config(&mut self, cfg: TournamentConfig) {
+        self.tournament_config = cfg;
     }
 
     pub fn render(
@@ -419,6 +439,15 @@ impl Renderer {
         } else {
             ""
         };
+        let save_state = if self.recording { " [RECORD]" } else { "" };
+        let tournament_state = if self.tournament_wins > 0 || self.tournament_config.games_per_run > 0 {
+            format!(
+                " [TOURNAMENT {}/{}]",
+                self.tournament_wins, self.tournament_config.games_per_run
+            )
+        } else {
+            String::new()
+        };
         queue!(
             writer,
             SetForegroundColor(accent),
@@ -428,6 +457,8 @@ impl Renderer {
                 "  [{}]  {}x{}  {}  mode:{}  difficulty:{}  speed:{}ms",
                 mode_label, size, size, engine.score(), diff.label(), self.ai_delay, ai_state
             )),
+            Print(&tournament_state),
+            Print(save_state),
             Print("\n"),
             SetForegroundColor(theme.border()),
             Print("─".repeat(78))
@@ -616,7 +647,7 @@ impl Renderer {
         )
     }
 
-    fn draw_footer(&self, writer: &mut impl Write, size: usize) -> io::Result<()> {
+    fn draw_footer(&self, writer: &mut impl Write, _size: usize) -> io::Result<()> {
         let theme = self.config.theme;
         let accent = theme.accent();
         let border_color = theme.border();
@@ -635,10 +666,18 @@ impl Renderer {
             ("p", "mode", accent),
             ("t", "theme", accent),
             ("d", "difficulty", accent),
-            ("e/h/s/a", "panels", accent),
-            ("z", "pause", accent),
-            ("+/-", "speed", accent),
-            ("1/2/3", "size", accent),
+            ("e", "eval panel", accent),
+            ("h", "history panel", accent),
+            ("s", "stats panel", accent),
+            ("a", "animations", accent),
+            ("z", "pause AI", accent),
+            ("+/-", "AI speed", accent),
+            ("1/2/3/0", "size 3-8", accent),
+            ("g", "save game", accent),
+            ("l", "load game", accent),
+            ("R", "record replay", accent),
+            ("T", "tournament", accent),
+            ("o", "target tile", accent),
             ("r", "restart", accent),
             ("q", "quit", Color::Red),
         ];
