@@ -5,7 +5,7 @@ use crossterm::{
     style::Color,
     terminal::{self, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use engine2048::{Direction, Engine, EvalMode};
+use engine2048::{Config, Direction, Engine, EvalMode};
 use std::io::{self, Write};
 
 const GRID_SIZE: usize = 4;
@@ -24,6 +24,8 @@ struct App {
     last_message: Option<String>,
     cursor: (usize, usize),
     game_state: GameState,
+    swap_target: Option<(usize, usize)>,
+    last_dir: Direction,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,7 +37,12 @@ enum GameState {
 
 impl App {
     fn new() -> Result<Self, engine2048::EngineError> {
-        let engine = Engine::with_size(GRID_SIZE)?;
+        let engine = Engine::new(Config {
+            size: GRID_SIZE,
+            swap_charges: 3,
+            delete_charges: 3,
+            ..Config::default()
+        })?;
         Ok(App {
             engine,
             mode: GameMode::Play,
@@ -43,6 +50,8 @@ impl App {
             last_message: None,
             cursor: (0, 0),
             game_state: GameState::Playing,
+            swap_target: None,
+            last_dir: Direction::Up,
         })
     }
 
@@ -82,7 +91,8 @@ impl App {
             for c in 0..GRID_SIZE {
                 let tile = grid[r][c];
                 let is_cursor = (r, c) == self.cursor;
-                self.draw_tile(writer, tile, is_cursor)?;
+                let is_swap_target = self.swap_target == Some((r, c));
+                self.draw_tile(writer, tile, is_cursor, is_swap_target)?;
                 if c < GRID_SIZE - 1 {
                     queue!(writer, crossterm::style::Print("  "))?;
                 }
@@ -92,17 +102,14 @@ impl App {
         Ok(())
     }
 
-    fn draw_tile(&self, writer: &mut impl Write, tile: u32, highlight: bool) -> io::Result<()> {
+    fn draw_tile(&self, writer: &mut impl Write, tile: u32, cursor: bool, swap: bool) -> io::Result<()> {
         let (color, label) = tile_to_style(tile);
-        let color = if highlight {
-            Color::White
+        let (color, label) = if cursor {
+            (Color::White, format!("╔{}╗", &label[1..4]))
+        } else if swap {
+            (Color::Yellow, format!("[{}] ", label.trim_end()))
         } else {
-            color
-        };
-        let label = if highlight {
-            format!("╔{}╗", &label[1..4])
-        } else {
-            label
+            (color, label)
         };
         queue!(
             writer,
@@ -127,9 +134,9 @@ impl App {
 
     fn draw_help(&self, writer: &mut impl Write) -> io::Result<()> {
         let help = match self.game_state {
-            GameState::Playing => " controls: ↑↓←→ move  u undo  p play/ai/eval  q quit",
-            GameState::Won => " *** WON ***  r restart  p mode  q quit",
-            GameState::Over => " *** GAME OVER ***  r restart  p mode  q quit",
+            GameState::Playing => " controls: ↑↓←→ move  s swap  x delete  u undo  p mode  q quit",
+            GameState::Won => " *** WON ***  r restart  s/x swap/delete  p mode  q quit",
+            GameState::Over => " *** GAME OVER ***  r restart  s/x swap/delete  p mode  q quit",
         };
         queue!(writer, crossterm::style::Print(help), crossterm::style::Print("\n"))
     }
@@ -154,32 +161,78 @@ impl App {
                 }
             }
             KeyCode::Up | KeyCode::Char('w') => {
+                self.last_dir = Direction::Up;
                 self.move_cursor(-1, 0);
-                if self.game_state == GameState::Playing {
+                if self.game_state == GameState::Playing && self.swap_target.is_none() {
                     self.do_move(Direction::Up)?;
                 }
             }
             KeyCode::Down | KeyCode::Char('s') => {
-                self.move_cursor(1, 0);
-                if self.game_state == GameState::Playing {
-                    self.do_move(Direction::Down)?;
+                // 's' is used for swap; only move cursor/down when swap_target is active
+                if self.swap_target.is_some() {
+                    self.last_dir = Direction::Down;
+                    self.move_cursor(1, 0);
+                    if self.game_state == GameState::Playing {
+                        self.do_move(Direction::Down)?;
+                    }
+                } else {
+                    self.last_dir = Direction::Down;
+                    self.move_cursor(1, 0);
                 }
             }
             KeyCode::Left | KeyCode::Char('a') => {
+                self.last_dir = Direction::Left;
                 self.move_cursor(0, -1);
-                if self.game_state == GameState::Playing {
+                if self.game_state == GameState::Playing && self.swap_target.is_none() {
                     self.do_move(Direction::Left)?;
                 }
             }
             KeyCode::Right | KeyCode::Char('d') => {
+                self.last_dir = Direction::Right;
                 self.move_cursor(0, 1);
-                if self.game_state == GameState::Playing {
+                if self.game_state == GameState::Playing && self.swap_target.is_none() {
                     self.do_move(Direction::Right)?;
                 }
             }
             KeyCode::Char('r') => {
                 if self.game_state != GameState::Playing {
                     self.restart();
+                }
+            }
+            KeyCode::Char('S') => {
+                // Shift+s for swap — select/confirm swap target
+                if self.game_state != GameState::Playing {
+                    return Ok(());
+                }
+                let (sr, sc) = self.cursor;
+                match self.swap_target {
+                    Some((tr, tc)) if (tr, tc) != (sr, sc) => {
+                        match self.engine.swap_tiles((tr, tc), (sr, sc)) {
+                            Ok(()) => {
+                                self.swap_target = None;
+                                self.last_message = Some("swapped".to_string());
+                            }
+                            Err(e) => {
+                                self.swap_target = None;
+                                self.last_message = Some(format!("{}", e));
+                            }
+                        }
+                    }
+                    _ => {
+                        self.swap_target = Some((sr, sc));
+                        self.last_message = Some("swap target selected — move to other tile".to_string());
+                    }
+                }
+            }
+            KeyCode::Char('x') => {
+                // Delete tile at cursor
+                if self.game_state != GameState::Playing {
+                    return Ok(());
+                }
+                let (r, c) = self.cursor;
+                match self.engine.delete_tile((r, c)) {
+                    Ok(()) => self.last_message = Some("deleted".to_string()),
+                    Err(e) => self.last_message = Some(format!("{}", e)),
                 }
             }
             _ => {}
@@ -194,9 +247,15 @@ impl App {
     }
 
     fn restart(&mut self) {
-        if let Ok(e) = Engine::with_size(GRID_SIZE) {
+        if let Ok(e) = Engine::new(Config {
+            size: GRID_SIZE,
+            swap_charges: 3,
+            delete_charges: 3,
+            ..Config::default()
+        }) {
             self.engine = e;
             self.cursor = (0, 0);
+            self.swap_target = None;
             self.game_state = GameState::Playing;
             self.last_message = Some("restarted".to_string());
         }
