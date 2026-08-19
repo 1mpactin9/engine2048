@@ -1,0 +1,40 @@
+/* Tailwind v4 — theme and utilities */
+@import "tailwindcss";
+
+@theme {
+  --color-off-white: rgb(250 248 240);
+  --color-brown: rgb(117 100 82);
+  --color-sand: rgb(234 231 217);
+  --color-tan: rgb(152 136 118);
+  --color-leather: rgb(186 172 154);
+  --color-dark-grey: rgb(83 79 72);
+  --color-tile-2: #eee4da;
+  --color-tile-4: #ede0c8;
+  --color-tile-8: #f2b179;
+  --color-tile-16: #f59563;
+  --color-tile-32: #f67c5f;
+  --color-tile-64: #f65e3b;
+  --color-tile-128: #edcf72;
+  --color-tile-256: #edcc61;
+  --color-tile-512: #edc850;
+  --color-tile-1024: #edc53f;
+  --color-tile-2048: #edc22e;
+  --font-sans: "Rubik", Arial, system-ui, sans-serif;
+  --shadow-button: 0px 5px 15px 0px rgba(140,100,60,0.12), 0px 2px 3px 0px rgba(140,100,60,0.09), inset 0px -1px 0px 0px rgba(0,0,0,0.1);
+}
+
+@layer base {
+  body {
+    @apply bg-off-white text-brown overflow-hidden select-none touch-none;
+  }
+}
+
+@keyframes pop {
+  0% { transform: scale(0.5); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
+
+.animate-pop {
+  animation: pop 0.15s ease-in-out;
+}
