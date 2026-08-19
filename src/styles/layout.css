@@ -656,6 +656,8 @@
   justify-content: center;
   padding: 24px;
   z-index: 60;
+  /* Backdrop fades in via CSS; the card itself is spring-animated in JS
+   * (see ui/overlay.ts — Kl: scale + opacity + translateY). */
   animation: fade-in 0.2s ease;
 }
 
@@ -678,7 +680,8 @@
   box-shadow: var(--shadow-board);
   padding: 28px 24px;
   text-align: center;
-  animation: fade-in 0.15s ease;
+  transform-origin: center;
+  will-change: transform, opacity;
 }
 
 .overlay__close {

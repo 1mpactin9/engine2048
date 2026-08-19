@@ -1,4 +1,5 @@
 import { Icons } from "./icons";
+import { KL, Spring, SpringRunner, prefersReducedMotion, resolveSpring } from "./animate";
 
 export interface OverlayAction {
   label: string;
@@ -17,6 +18,13 @@ export interface OverlayOptions {
 
 export class Overlay {
   private el: HTMLElement | null = null;
+  private runner: SpringRunner | null = null;
+  // Current animated values for the card (Kl: scale + opacity + translateY).
+  // We track these so the spring has a coherent "from" state if `show` is
+  // called again before the previous spring finishes.
+  private cardScale = 0;
+  private cardOpacity = 0;
+  private cardTranslateY = 0;
 
   show(opts: OverlayOptions): void {
     this.close();
@@ -69,9 +77,46 @@ export class Overlay {
     overlay.appendChild(card);
     document.body.appendChild(overlay);
     this.el = overlay;
+
+    // Kl animation: card scales 0→1, fades 0→1, and translates from
+    // translateY(300px) up to translateY(0). Three parallel springs
+    // driven by the Kl preset (duration 350ms, bounce 0.3). The overlay
+    // backdrop is a static fade-in (CSS keyframe `fade-in`).
+    // Respects `prefers-reduced-motion` by snapping the card to its final
+    // state with no spring.
+    this.cardScale = prefersReducedMotion() ? 1 : 0;
+    this.cardOpacity = prefersReducedMotion() ? 1 : 0;
+    this.cardTranslateY = prefersReducedMotion() ? 0 : 300;
+    this.applyCardTransform(card);
+    if (prefersReducedMotion()) return;
+    this.runner = new SpringRunner();
+    const cfg = resolveSpring(KL);
+    const scaleSpring = new Spring(0, 1, cfg);
+    const opacitySpring = new Spring(0, 1, cfg);
+    const translateSpring = new Spring(300, 0, cfg);
+    this.runner.add(scaleSpring, (v) => {
+      this.cardScale = v;
+      this.applyCardTransform(card);
+    });
+    this.runner.add(opacitySpring, (v) => {
+      this.cardOpacity = v;
+      this.applyCardTransform(card);
+    });
+    this.runner.add(translateSpring, (v) => {
+      this.cardTranslateY = v;
+      this.applyCardTransform(card);
+    });
+    this.runner.start();
+  }
+
+  private applyCardTransform(card: HTMLElement): void {
+    card.style.opacity = String(this.cardOpacity);
+    card.style.transform = `scale(${this.cardScale}) translateY(${this.cardTranslateY}px)`;
   }
 
   close(): void {
+    this.runner?.stop();
+    this.runner = null;
     if (this.el) {
       this.el.remove();
       this.el = null;

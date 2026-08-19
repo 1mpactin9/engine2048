@@ -2,6 +2,13 @@ import type { ThemePref } from "../core/storage";
 import { SIZES } from "../core/constants";
 import { Icons } from "./icons";
 import type { UsageMode } from "../core/usage";
+import {
+  YL,
+  Spring,
+  SpringRunner,
+  prefersReducedMotion,
+  resolveSpring,
+} from "./animate";
 
 export interface SegOption {
   label: string;
@@ -123,6 +130,12 @@ export class SettingsPopover {
   };
   private open = false;
   private opts: PopoverOpts;
+  // Animation state for the Yl slide. `runner` is non-null while a slide
+  // is in progress. `y` is the popover's current translateY in px; the
+  // target is 0 (open) or -POPOVER_RANGE (closed).
+  private runner: SpringRunner | null = null;
+  private y = 0;
+  private static readonly POPOVER_RANGE = -70;
 
   constructor(opts: PopoverOpts) {
     this.opts = opts;
@@ -391,7 +404,15 @@ export class SettingsPopover {
   private openPopover(): void {
     this.open = true;
     this.popover.hidden = false;
-    requestAnimationFrame(() => this.layoutThumbs());
+    // Snap to the closed offset first so the slide is visible, then
+    // schedule a layout pass for the segmented thumbs. We start the Yl
+    // spring after the browser has painted the initial position.
+    this.y = SettingsPopover.POPOVER_RANGE;
+    this.popover.style.transform = `translateY(${this.y}px)`;
+    requestAnimationFrame(() => {
+      this.layoutThumbs();
+      this.slideTo(0);
+    });
   }
 
   private layoutThumbs(): void {
@@ -402,9 +423,59 @@ export class SettingsPopover {
     this.usageSeg.layout();
   }
 
+  /**
+   * Slide the popover to `targetY` (px) using the Yl spring. The Yl config
+   * is Svelte-style explicit physics:
+   *   stiffness 200, damping 7, mass 0.3, velocity 50, duration ~800ms
+   * The bounce comes from the natural underdamping of those constants.
+   * `onSettle` fires once the spring lands (so close() can hide the element).
+   * Respects `prefers-reduced-motion` by snapping straight to the target.
+   */
+  private slideTo(targetY: number, onSettle?: () => void): void {
+    this.runner?.stop();
+    if (prefersReducedMotion()) {
+      this.y = targetY;
+      this.popover.style.transform = `translateY(${targetY}px)`;
+      this.runner = null;
+      onSettle?.();
+      return;
+    }
+    const runner = new SpringRunner();
+    this.runner = runner;
+    const cfg = resolveSpring({
+      stiffness: YL.stiffness,
+      damping: YL.damping,
+      mass: YL.mass,
+    });
+    const spring = new Spring(this.y, targetY, {
+      ...cfg,
+      precision: 0.01,
+    });
+    runner.add(spring, (v) => {
+      this.y = v;
+      this.popover.style.transform = `translateY(${v}px)`;
+    });
+    runner.start(0, () => {
+      if (this.runner === runner) this.runner = null;
+      onSettle?.();
+    });
+  }
+
   close(): void {
     this.open = false;
-    this.popover.hidden = true;
+    if (this.popover.hidden) return;
+    this.slideTo(SettingsPopover.POPOVER_RANGE, () => {
+      if (this.open) return; // reopened mid-close
+      this.popover.hidden = true;
+      this.popover.style.transform = "";
+    });
+    // Safety net: if the spring stalls (e.g. tab backgrounded) still hide
+    // after the Yl duration so the UI never gets stuck.
+    window.setTimeout(() => {
+      if (this.open) return;
+      this.popover.hidden = true;
+      this.popover.style.transform = "";
+    }, YL.durationMs + 100);
   }
 
   private applyPowerupVisibility(): void {
