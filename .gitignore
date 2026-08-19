@@ -26,8 +26,8 @@ dist-ssr
 .codegraph/
 results.json
 
-engine/pkg/
-engine/target/
+pkg/
+target/
 
 engine-reference/
 external/
