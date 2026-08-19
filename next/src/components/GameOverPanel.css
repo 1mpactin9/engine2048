@@ -1,0 +1,112 @@
+.gameover-panel {
+  width: min(92vw, 440px);
+  margin: 20px auto 0;
+  text-align: center;
+  animation: go-in 0.3s var(--ease-overshoot) both;
+}
+
+@keyframes go-in {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+.gameover-title {
+  font-size: 1.3rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0 0 4px;
+}
+
+.gameover-summary {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin: 0 0 14px;
+}
+
+.gameover-used {
+  background: var(--bg-powerups);
+  border-radius: 12px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.gameover-used-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.gameover-used-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.gameover-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.go-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: transform 0.14s var(--ease-overshoot), background-color 0.15s, opacity 0.15s;
+}
+
+.go-btn-icon {
+  display: flex;
+  width: 18px;
+  height: 18px;
+}
+
+.go-btn--fill {
+  background: var(--text-secondary);
+  color: #fff;
+}
+
+.go-btn--fill:hover {
+  background: #86755f;
+}
+
+.go-btn--outline {
+  background: transparent;
+  color: var(--text-secondary);
+  box-shadow: inset 0 0 0 2px var(--text-secondary);
+}
+
+.go-btn--outline:hover:not(.go-btn--disabled) {
+  background: rgba(152, 136, 118, 0.08);
+}
+
+.go-btn--disabled {
+  color: var(--disabled-button-powerups);
+  box-shadow: inset 0 0 0 2px var(--disabled-button-powerups);
+  cursor: not-allowed;
+}
+
+.go-btn:active:not(.go-btn--disabled) {
+  transform: scale(0.98);
+}
+
+.gameover-outof {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 2px 0 0;
+}

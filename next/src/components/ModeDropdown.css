@@ -1,0 +1,95 @@
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  width: 210px;
+  background: var(--bg-dropdown);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14), 0 2px 8px rgba(0, 0, 0, 0.06);
+  z-index: 40;
+  transform-origin: top left;
+  animation: dropdown-in 0.42s var(--ease-overshoot) both;
+}
+
+@keyframes dropdown-in {
+  0% {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.96);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(4px) scale(1.01);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.dropdown-list {
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  color: var(--dropdown-text-muted);
+  font-size: 0.92rem;
+  font-weight: 600;
+  transition: background-color 0.15s var(--ease-standard), color 0.15s, transform 0.15s var(--ease-overshoot);
+  text-align: left;
+}
+
+.dropdown-item:hover {
+  background: rgba(122, 106, 89, 0.1);
+  color: var(--dropdown-text);
+}
+
+.dropdown-item:active {
+  transform: scale(0.98);
+}
+
+.dropdown-item.is-selected {
+  background: var(--dropdown-selected-bg);
+  color: var(--dropdown-selected-text);
+}
+
+.item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.item-icon--plus {
+  color: var(--dropdown-accent);
+}
+
+.item-label {
+  flex: 1;
+}
+
+.dropdown-github {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  background: var(--dropdown-github-bg);
+  color: var(--dropdown-github-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s;
+}
+
+.dropdown-github:hover {
+  opacity: 0.75;
+}

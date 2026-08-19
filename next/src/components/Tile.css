@@ -1,0 +1,97 @@
+.tile {
+  position: absolute;
+  width: calc(25% - 3.2% * 3 / 4);
+  height: calc(25% - 3.2% * 3 / 4);
+  border-radius: 8px;
+  background: var(--tile-bg);
+  color: var(--tile-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: var(--font-size);
+  font-variant-numeric: tabular-nums;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.35),
+    0 2px 4px rgba(0, 0, 0, 0.08);
+  transition: transform 0.13s var(--ease-overshoot);
+  will-change: transform;
+  user-select: none;
+}
+
+@keyframes tile-spawn {
+  0% {
+    opacity: 0;
+    scale: 0.3;
+  }
+  70% {
+    opacity: 1;
+    scale: 1.08;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+.tile--spawn {
+  animation: tile-spawn 0.22s var(--ease-overshoot) both;
+}
+
+@keyframes tile-merge {
+  0% {
+    scale: 1;
+  }
+  35% {
+    scale: 1.18;
+  }
+  70% {
+    scale: 0.97;
+  }
+  100% {
+    scale: 1;
+  }
+}
+
+.tile--merge {
+  animation: tile-merge 0.22s var(--ease-overshoot) both;
+}
+
+/* Powerup tool-select interaction states */
+.tile--toolable {
+  cursor: pointer;
+}
+
+.tile--dim {
+  opacity: 0.45;
+  scale: 0.88;
+  transition: opacity 0.15s var(--ease-standard), scale 0.15s var(--ease-standard), transform 0.13s var(--ease-overshoot);
+}
+
+.tile--dim:hover {
+  opacity: 1;
+  scale: 1.06;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.35),
+    0 0 0 3px #ffffff,
+    0 4px 10px rgba(0, 0, 0, 0.16);
+}
+
+.tile--swap-mode {
+  opacity: 0.5;
+  scale: 0.86;
+  transition: opacity 0.15s var(--ease-standard), scale 0.15s var(--ease-standard), transform 0.13s var(--ease-overshoot);
+}
+
+.tile--swap-mode:hover {
+  opacity: 1;
+  scale: 1.08;
+}
+
+.tile--swap-mode.tile--selected {
+  opacity: 1;
+  scale: 1.08;
+  box-shadow:
+    inset 0 1.5px 0 rgba(255, 255, 255, 0.35),
+    0 0 0 3px var(--dropdown-accent),
+    0 4px 10px rgba(0, 0, 0, 0.16);
+}
