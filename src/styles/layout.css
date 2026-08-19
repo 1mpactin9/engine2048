@@ -102,7 +102,8 @@
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
 }
 
 .btn--primary {
@@ -365,7 +366,10 @@
 }
 
 .powerup-btn:disabled {
-  opacity: 0.4;
+  background: var(--disabled-bg);
+  border-color: var(--disabled-bg);
+  color: var(--disabled-text);
+  opacity: 1;
 }
 
 .powerup-btn.is-armed {
@@ -415,8 +419,8 @@
 }
 
 .powerup-btn:disabled .powerup-btn__count {
-  background: var(--muted);
-  color: var(--bg-elev);
+  background: var(--disabled-indicator);
+  color: var(--disabled-text);
 }
 
 .powerup-btn__tooltip {
@@ -479,7 +483,7 @@
 
 .game-over-bar.is-visible {
   display: flex;
-  animation: freeze-in 0.3s ease-out;
+  animation: fade-in-up 0.3s ease-out;
 }
 
 .game-over-bar__action {
@@ -519,10 +523,12 @@
 }
 
 .game-over-bar__action:disabled {
-  opacity: 0.5;
+  background: var(--disabled-bg);
+  color: var(--disabled-text);
+  box-shadow: none;
 }
 
-@keyframes freeze-in {
+@keyframes fade-in-up {
   from {
     opacity: 0;
     transform: translateY(4px);
@@ -576,6 +582,11 @@
   font-size: 13px;
   color: var(--dropdown-text);
   min-width: 0;
+}
+
+.popover__row-label {
+  font-weight: 600;
+  font-size: 13px;
 }
 
 .popover__field {

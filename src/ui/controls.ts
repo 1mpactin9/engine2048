@@ -232,8 +232,7 @@ export class SettingsPopover {
     autoRow.className = "popover__row";
     const autoLabel = document.createElement("span");
     autoLabel.textContent = "Engine";
-    autoLabel.style.fontWeight = "600";
-    autoLabel.style.fontSize = "13px";
+    autoLabel.className = "popover__row-label";
     const autoSwitch = document.createElement("button");
     autoSwitch.type = "button";
     autoSwitch.className = "switch" + (this.opts.autoOn ? " is-on" : "");
@@ -249,8 +248,7 @@ export class SettingsPopover {
     rngRow.className = "popover__row";
     const rngLabel = document.createElement("span");
     rngLabel.textContent = "RNG Manipulation";
-    rngLabel.style.fontWeight = "600";
-    rngLabel.style.fontSize = "13px";
+    rngLabel.className = "popover__row-label";
     const rngSwitch = document.createElement("button");
     rngSwitch.type = "button";
     rngSwitch.className = "switch" + (this.opts.rngManip ? " is-on" : "");
@@ -266,8 +264,7 @@ export class SettingsPopover {
     detRow.className = "popover__row";
     const detLabel = document.createElement("span");
     detLabel.textContent = "Deterministic Algorithm";
-    detLabel.style.fontWeight = "600";
-    detLabel.style.fontSize = "13px";
+    detLabel.className = "popover__row-label";
     const detSwitch = document.createElement("button");
     detSwitch.type = "button";
     detSwitch.className = "switch" + (this.opts.deterministic ? " is-on" : "");
@@ -319,8 +316,7 @@ export class SettingsPopover {
     backtrackRow.className = "popover__row";
     const backtrackLabel = document.createElement("span");
     backtrackLabel.textContent = "Backtrack";
-    backtrackLabel.style.fontWeight = "600";
-    backtrackLabel.style.fontSize = "13px";
+    backtrackLabel.className = "popover__row-label";
     const backtrackSwitch = document.createElement("button");
     backtrackSwitch.type = "button";
     backtrackSwitch.className =
@@ -349,8 +345,7 @@ export class SettingsPopover {
     powerupRow.className = "popover__row";
     const powerupLabel = document.createElement("span");
     powerupLabel.textContent = "Power-ups";
-    powerupLabel.style.fontWeight = "600";
-    powerupLabel.style.fontSize = "13px";
+    powerupLabel.className = "popover__row-label";
     const powerupSwitch = document.createElement("button");
     powerupSwitch.type = "button";
     powerupSwitch.className =
