@@ -17,6 +17,7 @@ struct SearchConfig {
     int    max_search_depth  = 8;   // hard ceiling; depth_limit is clamped to this regardless of tile count
     size_t tt_size_pow2       = (1u << 22);
     bool   use_cache          = true;
+    bool   use_root_ordering  = true; // sort root moves by heuristic before searching
 };
 
 struct SearchStats {
@@ -87,11 +88,29 @@ private:
         // so tie-breaking is deterministic by move order (UP, DOWN, LEFT,
         // RIGHT) rather than by incidental float noise.
         constexpr float TIE_EPSILON = 1e-3f;
+
+        // Gather legal moves and their heuristic scores for root move ordering.
+        // Ordering highest-scoring moves first improves transposition-table hit
+        // rates because the strongest branches are searched first and cached,
+        // making later branches more likely to resolve via cache.
+        struct MoveCandidate { int move; float score; };
+        std::vector<MoveCandidate> candidates;
+        candidates.reserve(NUM_MOVES);
         for (int m = 0; m < NUM_MOVES; ++m) {
             board_t nb = tables_.execute_move(m, board);
             if (nb == board) continue;
-            float s = score_tilechoose(ctx, nb, 1.0f);
-            if (s > best_score + TIE_EPSILON) { best_score = s; best_move_idx = m; }
+            candidates.push_back({m, tables_.score_heur(nb)});
+        }
+        if (cfg_.use_root_ordering) {
+            std::sort(candidates.begin(), candidates.end(),
+                      [](const MoveCandidate& a, const MoveCandidate& b) {
+                          return a.score > b.score; // highest heuristic first
+                      });
+        }
+
+        for (const auto& cand : candidates) {
+            float s = score_tilechoose(ctx, tables_.execute_move(cand.move, board), 1.0f);
+            if (s > best_score + TIE_EPSILON) { best_score = s; best_move_idx = cand.move; }
         }
         return best_move_idx;
     }
@@ -150,13 +169,13 @@ private:
         ctx.curdepth++;
         for (int m = 0; m < NUM_MOVES; ++m) {
             board_t nb = tables_.execute_move(m, board);
-            ctx.moves_evaled++;
             if (nb != board) {
                 // cprob here is the probability of reaching `board` (the
                 // board state *after* this move).  Each spawn position has
                 // equal probability cprob / num_open, so we pass that to
                 // the child chance node.
                 int num_open = count_empty(nb);
+                ctx.moves_evaled++;
                 if (num_open > 0) {
                     float per_pos = cprob / float(num_open);
                     best = std::max(best, score_tilechoose(ctx, nb, per_pos));

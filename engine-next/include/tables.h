@@ -28,6 +28,7 @@ public:
         snake_row_even.resize(65536);
         snake_row_odd.resize(65536);
         corner_weight_ = w.corner_weight;
+        adjacent_empty_weight_ = w.adjacent_empty_weight;
         build(w);
         build_snake();
     }
@@ -88,6 +89,9 @@ public:
         if (corner_weight_ != 0.0f) {
             base += std::max(snake_one_orientation(board), snake_one_orientation(t)) * corner_weight_;
         }
+        if (adjacent_empty_weight_ != 0.0f) {
+            base += score_adjacent_empty(board) * adjacent_empty_weight_;
+        }
         return base;
     }
 
@@ -97,6 +101,35 @@ public:
 
 private:
     float corner_weight_ = 0.0f;
+    float adjacent_empty_weight_ = 0.0f;
+
+    // Count orthogonal (horizontal + vertical) adjacent pairs of empty cells.
+    // Useful because adjacent empties create merge opportunities; isolated
+    // empties are less valuable even though the raw count is the same.
+    inline float score_adjacent_empty(board_t board) const {
+        float count = 0.0f;
+        // Horizontal adjacency: (row, col) and (row, col+1)
+        for (int row = 0; row < 4; ++row) {
+            for (int col = 0; col < 3; ++col) {
+                int idx = row * 4 + col;
+                if (((board >> (idx * 4)) & 0xf) == 0 &&
+                    ((board >> ((idx + 1) * 4)) & 0xf) == 0) {
+                    ++count;
+                }
+            }
+        }
+        // Vertical adjacency: (row, col) and (row+1, col)
+        for (int row = 0; row < 3; ++row) {
+            for (int col = 0; col < 4; ++col) {
+                int idx = row * 4 + col;
+                if (((board >> (idx * 4)) & 0xf) == 0 &&
+                    ((board >> ((idx + 4) * 4)) & 0xf) == 0) {
+                    ++count;
+                }
+            }
+        }
+        return count;
+    }
 
     inline float snake_one_orientation(board_t b) const {
         return snake_row_even[(b >> 0) & ROW_MASK] + snake_row_odd[(b >> 16) & ROW_MASK] +
