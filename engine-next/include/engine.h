@@ -60,7 +60,7 @@ public:
             stats_out->moves_evaled = ctx.moves_evaled;
             stats_out->cache_hits = ctx.cache_hits;
             stats_out->max_depth_reached = ctx.maxdepth;
-            stats_out->legal_moves_from_root = static_cast<int>(candidates.size());
+            stats_out->legal_moves_from_root = ctx.legal_root_moves;
         }
         return best_move_idx;
     }
@@ -75,6 +75,7 @@ private:
         uint64_t moves_evaled = 0;
         uint64_t cache_hits = 0;
         int maxdepth = 0;
+        int legal_root_moves = 0; // set during search_at_depth for stats reporting
     };
 
     int search_at_depth(board_t board, Ctx& ctx) {
@@ -110,6 +111,7 @@ private:
                           return a.score > b.score; // highest heuristic first
                       });
         }
+        ctx.legal_root_moves = static_cast<int>(candidates.size());
 
         for (const auto& cand : candidates) {
             float s = score_tilechoose(ctx, tables_.execute_move(cand.move, board), 1.0f);
