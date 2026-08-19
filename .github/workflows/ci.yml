@@ -2,34 +2,21 @@ name: CI
 
 on:
   push:
-    branches: [main, engine-rework, '*']
+    branches: [main, engine-rework]
   pull_request:
     branches: [main]
 
 jobs:
   build-test:
-    name: ${{ matrix.os }} (gcc-${{ matrix.compiler == 'gcc' && matrix.version || 'clang-' + matrix.version }})
+    name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-22.04, windows-latest, macOS-latest]
-        compiler: [gcc, clang]
-        exclude:
-          - os: windows-latest
-            compiler: clang
-          - os: macOS-latest
-            compiler: gcc
+        os: [ubuntu-latest, windows-latest, macOS-latest]
 
     steps:
     - uses: actions/checkout@v4
-
-    - name: Install GCC (Linux)
-      if: matrix.compiler == 'gcc'
-      run: sudo apt-get install -y g++-${{ matrix.version }}
-      with:
-        version: '12'
-      continue-on-error: true
 
     - name: Configure (CMake)
       working-directory: engine-next
@@ -43,8 +30,6 @@ jobs:
       working-directory: engine-next
       run: ctest --test-dir build --output-on-failure
 
-    - name: Quick smoke test
+    - name: Smoke test
       working-directory: engine-next/build
-      run: |
-        ./engine2048 --games 2 --seed 1 --max-depth 5
-        ./test_correctness
+      run: ./engine2048 --games 2 --seed 1 --max-depth 5 && ./test_correctness

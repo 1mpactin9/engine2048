@@ -13,7 +13,7 @@ pub struct SearchStats {
     /// Number of distinct board positions hashed into the TT.
     pub tt_entries: usize,
     /// Direction of the best move found, if any.
-    pub best_direction: Option<Direction>,
+    pub best_direction: Option<crate::Direction>,
     /// Score of the best move found.
     pub best_score: f64,
 }

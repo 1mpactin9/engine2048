@@ -53,5 +53,23 @@
     "depth_bias": 2,
     "max_depth": 8,
     "weights": { "corner_weight": 15.0 }
+  },
+  "adjacent_empty": {
+    "description": "baseline + adjacent-empty-cell adjacency bonus (weight 80), rewards connected empty regions",
+    "tt_bits": 22,
+    "cache_depth_limit": 15,
+    "min_depth": 3,
+    "depth_bias": 2,
+    "max_depth": 8,
+    "weights": { "adjacent_empty_weight": 80.0 }
+  },
+  "full_heuristic": {
+    "description": "all heuristic terms active: corner + adjacent empty, baseline weights",
+    "tt_bits": 22,
+    "cache_depth_limit": 15,
+    "min_depth": 3,
+    "depth_bias": 2,
+    "max_depth": 8,
+    "weights": { "corner_weight": 15.0, "adjacent_empty_weight": 80.0 }
   }
 }

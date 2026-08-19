@@ -411,7 +411,7 @@ impl Engine {
         depth: Option<usize>,
         usage: crate::UsageMode,
     ) -> Option<Direction> {
-        Self::suggest_move_with_usage(&self.grid, depth, usage)
+        Self::suggest_move_with_usage(&self.grid, depth, usage).0
     }
 
     pub fn suggest_move_for_guarantee(&self, usage: crate::UsageMode) -> Option<Direction> {

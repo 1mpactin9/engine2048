@@ -71,6 +71,8 @@ static Args parse_args(int argc, char **argv)
             a.w.empty_weight = argf(next());
         else if (k == "--corner-weight")
             a.w.corner_weight = argf(next());
+        else if (k == "--empty-adjacent-weight")
+            a.w.adjacent_empty_weight = argf(next());
         else if (k == "--verbose")
             a.verbose = true;
         else if (k == "--replay")
@@ -94,7 +96,8 @@ static Args parse_args(int argc, char **argv)
                    "                          proven design plus this cap for boards with many distinct tiles)\n"
                    "  --reset-cache-each-game clear cache between games (isolates per-game timing)\n"
                    "  --lost-penalty F, --mono-power F, --mono-weight F, --sum-power F,\n"
-                   "  --sum-weight F, --merges-weight F, --empty-weight F, --corner-weight F  heuristic weights\n"
+                   "  --sum-weight F, --merges-weight F, --empty-weight F, --corner-weight F,\n"
+                   "  --empty-adjacent-weight F  heuristic weights\n"
                    "  --verbose               print per-game results\n"
                    "  --replay                print board after every move (for debugging)\n"
                    "  --parallel              parallelize games across threads (requires OpenMP)\n"

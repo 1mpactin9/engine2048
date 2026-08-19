@@ -100,7 +100,7 @@ impl Engine {
     ) -> (Option<Direction>, SearchStats) {
         let search_depth =
             Self::endgame_depth(grid, depth.unwrap_or_else(|| Self::auto_depth(grid)));
-        let (dir, val, stats) = Self::best_move_with_stats(grid, search_depth, usage, true);
+        let (dir, _val, stats) = Self::best_move_with_stats(grid, search_depth, usage, true);
         (dir, stats)
     }
 
@@ -116,7 +116,8 @@ impl Engine {
         let distinct = bitboard_mod::count_distinct_tiles(&board);
         let base_depth = 3usize.max(distinct.saturating_sub(2));
         let final_depth = Self::endgame_depth(grid, base_depth);
-        Self::best_move_with_stats(grid, final_depth, usage, true)
+        let (dir, _val, stats) = Self::best_move_with_stats(grid, final_depth, usage, true);
+        (dir, stats)
     }
 
     pub(crate) fn ordered_directions(board: &[u32], n: usize) -> [(Direction, bool, f64); 4] {
