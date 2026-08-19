@@ -19,6 +19,16 @@ impl Direction {
         Direction::Left,
         Direction::Right,
     ];
+
+    /// Return a 0-3 index for this direction, matching the ordering in `ALL`.
+    pub(crate) fn index_from(dir: &Direction) -> usize {
+        match dir {
+            Direction::Up => 0,
+            Direction::Down => 1,
+            Direction::Left => 2,
+            Direction::Right => 3,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

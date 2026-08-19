@@ -44,7 +44,10 @@ inline board_t initial_board(RNG& rng) {
     return insert_tile_rand(board, draw_tile(rng), rng);
 }
 
-inline GameResult play_one_game(Engine& engine, uint64_t seed, bool reset_cache_each_game = false) {
+// Simulate a single game. Returns stats; if board_out is non-null it is set
+// to the final board state (for replay / debugging).
+inline GameResult play_one_game(Engine& engine, uint64_t seed, bool reset_cache_each_game = false,
+                                 board_t* board_out = nullptr) {
     RNG rng(seed);
     board_t board = initial_board(rng);
     GameResult result;

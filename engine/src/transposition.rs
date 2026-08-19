@@ -12,6 +12,12 @@ const TT_MASK: u64 = (TT_SIZE as u64) - 1;
 const ZOBRIST_CELLS: usize = 256;
 const ZOBRIST_RANKS: usize = 32;
 
+/// Return the current transposition table size in entries.
+/// Useful for diagnostics; matches the size allocated by `set_tt_bits`.
+pub fn tt_size() -> usize {
+    TT.with(|c| c.borrow().len())
+}
+
 /// Rebuild the thread-local transposition table with a new size
 /// (must be a power of two, 2^`bits` entries).  Call before the first
 /// search; does nothing if the table has already been initialised on

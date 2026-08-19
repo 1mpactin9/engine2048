@@ -142,10 +142,17 @@ impl Engine {
         depth: usize,
         budget: &mut u64,
         max_cells: usize,
+        history: &mut HistoryTable,
     ) -> (Option<Direction>, f64) {
         let n = grid.len();
         let board = Self::flatten(grid);
-        let ordered = Self::ordered_directions(&board, n);
+        let mut ordered = Self::ordered_directions(&board, n);
+        // Re-order using history heuristic: higher-scoring directions first.
+        ordered.sort_by(|a, b| {
+            let score_a = a.2 + history.score(Direction::index_from(&a.0)) as f64;
+            let score_b = b.2 + history.score(Direction::index_from(&b.0)) as f64;
+            score_b.partial_cmp(&score_a).unwrap()
+        });
         let mut best_dir = None;
         let mut best_val = f64::NEG_INFINITY;
         let mut new_board = [0u32; 256];
@@ -167,6 +174,12 @@ impl Engine {
                     1.0,
                     max_cells,
                 );
+            // Update history: the best move at this depth gets a boost.
+            if value >= best_val {
+                history.update(Direction::index_from(&dir), depth, true);
+            } else if best_dir.is_some() {
+                history.update(Direction::index_from(&dir), depth, false);
+            }
             if value > best_val {
                 best_val = value;
                 best_dir = Some(dir);
@@ -185,6 +198,16 @@ impl Engine {
         max_depth: usize,
         usage: UsageMode,
     ) -> (Option<Direction>, f64) {
+        let (dir, val, _) = Self::best_move_with_stats(grid, max_depth, usage, false);
+        (dir, val)
+    }
+
+    fn best_move_with_stats(
+        grid: &Vec<Vec<u32>>,
+        max_depth: usize,
+        usage: UsageMode,
+        update_history: bool,
+    ) -> (Option<Direction>, f64, SearchStats) {
         let start = now_ms();
         let time_budget_ms = usage.time_budget_ms() as f64;
         let scale = usage.node_budget_scale();
@@ -192,14 +215,24 @@ impl Engine {
         let mut best_dir = None;
         let mut best_val = f64::NEG_INFINITY;
         let mut depth = 1;
+        let mut nodes_visited = 0u64;
+        let mut history = HistoryTable::new();
         const GROWTH_SAFETY_FACTOR: f64 = 6.0;
         loop {
             let pass_start = now_ms();
             set_search_deadline(pass_start + time_budget_ms * HARD_TIME_MULTIPLIER);
             let mut budget = Self::scaled_budget_for_depth(depth, scale);
-            let (dir, val) = Self::best_move_fixed(grid, depth, &mut budget, max_cells);
+            let (dir, val) = if update_history {
+                Self::best_move_fixed(grid, depth, &mut budget, max_cells, &mut history)
+            } else {
+                // Skip history when called internally for power-up evaluation.
+                let mut fake_history = HistoryTable::new();
+                Self::best_move_fixed(grid, depth, &mut budget, max_cells, &mut fake_history)
+            };
             clear_search_deadline();
             let pass_elapsed = now_ms() - pass_start;
+            let initial_budget = Self::scaled_budget_for_depth(depth, scale);
+            nodes_visited += initial_budget.saturating_sub(budget);
             if dir.is_some() {
                 best_dir = dir;
                 best_val = val;
@@ -212,7 +245,16 @@ impl Engine {
             }
             depth += 1;
         }
-        (best_dir, best_val)
+        let tt_entries = crate::transposition::tt_size();
+        let stats = SearchStats {
+            nodes_visited,
+            depth_reached: depth,
+            elapsed_ms: now_ms() - start,
+            tt_entries,
+            best_direction: best_dir,
+            best_score: best_val,
+        };
+        (best_dir, best_val, stats)
     }
 
     pub fn suggest_move_with_eval_mode(grid: &Vec<Vec<u32>>, mode: EvalMode) -> Option<Direction> {
@@ -274,7 +316,7 @@ impl Engine {
         let max_cells = usage.max_sampled_cells().min(MAX_SAMPLED_CELLS_CAP);
         let mut budget = Self::scaled_budget_for_depth(d, usage.node_budget_scale());
 
-        let (best_dir, move_val) = Self::best_move(grid, d, usage);
+        let (best_dir, move_val, _) = Self::best_move_with_stats(grid, d, usage, true);
 
         let stuck = best_dir.is_none();
         if !stuck && !Self::is_dangerous(grid) {
@@ -294,7 +336,10 @@ impl Engine {
                     }
                     let mut g = grid.clone();
                     g[r][c] = 0;
-                    let v = Self::best_move_fixed(&g, d, &mut budget, max_cells).1;
+                    let mut delete_history = HistoryTable::new();
+                    let v =
+                        Self::best_move_fixed(&g, d, &mut budget, max_cells, &mut delete_history)
+                            .1;
                     if v > best_delete_val {
                         best_delete_val = v;
                         best_delete = Some((r, c));
@@ -315,7 +360,15 @@ impl Engine {
                 let tmp = g[a.0][a.1];
                 g[a.0][a.1] = g[b.0][b.1];
                 g[b.0][b.1] = tmp;
-                let v = Self::best_move_fixed(&g, d, &mut budget, max_cells).1;
+                let mut swap_history = HistoryTable::new();
+                let v = Self::best_move_fixed(
+                    &g,
+                    d,
+                    &mut budget,
+                    max_cells,
+                    &mut swap_history,
+                )
+                .1;
                 if v > best_swap_val {
                     best_swap_val = v;
                     best_swap = Some((a, b));
@@ -340,9 +393,8 @@ impl Engine {
 
     pub(crate) fn is_dangerous(grid: &Vec<Vec<u32>>) -> bool {
         let n = grid.len();
-        let empties = grid.iter().flatten().filter(|&&v| v == 0).count();
-        let threshold = (n * n / 6).max(2);
-        empties <= threshold
+        let filled = grid.iter().flatten().filter(|&&v| v != 0).count();
+        filled >= DANGER_FILLED_THRESHOLD
     }
 
     fn default_depth(size: usize) -> usize {
