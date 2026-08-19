@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <chrono>
+#include <vector>
 
 namespace eng {
 
@@ -24,6 +25,7 @@ struct SearchStats {
     uint64_t moves_evaled = 0;
     uint64_t cache_hits = 0;
     int      max_depth_reached = 0;
+    int      legal_moves_from_root = 0; // number of legal moves considered at the root
 };
 
 class Engine {
@@ -58,6 +60,7 @@ public:
             stats_out->moves_evaled = ctx.moves_evaled;
             stats_out->cache_hits = ctx.cache_hits;
             stats_out->max_depth_reached = ctx.maxdepth;
+            stats_out->legal_moves_from_root = static_cast<int>(candidates.size());
         }
         return best_move_idx;
     }

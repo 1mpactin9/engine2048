@@ -4,6 +4,9 @@ const PRUNE_MARGIN: f64 = 600.0;
 const MAX_SAMPLED_CELLS_CAP: usize = 16;
 const TIME_CHECK_NODE_INTERVAL: u64 = 512;
 const HARD_TIME_MULTIPLIER: f64 = 2.0;
+/// How many filled cells to require before declaring a board "dangerous"
+/// (triggering power-up exploration in `suggest_action`).
+const DANGER_FILLED_THRESHOLD: usize = 12;
 
 /// How many extra search plies to add when the board is nearly full
 /// (`<= ENDGAME_EMPTY_THRESHOLD` empties).  Going deeper in the endgame
@@ -32,6 +35,8 @@ pub(crate) fn now_ms() -> f64 {
 }
 
 use crate::board as bitboard_mod;
+use crate::history::HistoryTable;
+use crate::stats::SearchStats;
 use crate::transposition::{tt_get, tt_put, zobrist_hash};
 use crate::{Action, Direction, Engine, EvalConfig, EvalMode, UsageMode};
 
@@ -85,25 +90,33 @@ impl Engine {
     }
 
     pub fn suggest_move_for(grid: &Vec<Vec<u32>>, depth: Option<usize>) -> Option<Direction> {
-        Self::suggest_move_with_usage(grid, depth, UsageMode::Balanced)
+        Self::suggest_move_with_usage(grid, depth, UsageMode::Balanced).0
     }
 
     pub fn suggest_move_with_usage(
         grid: &Vec<Vec<u32>>,
         depth: Option<usize>,
         usage: UsageMode,
-    ) -> Option<Direction> {
+    ) -> (Option<Direction>, SearchStats) {
         let search_depth =
             Self::endgame_depth(grid, depth.unwrap_or_else(|| Self::auto_depth(grid)));
-        Self::best_move(grid, search_depth, usage).0
+        let (dir, val, stats) = Self::best_move_with_stats(grid, search_depth, usage, true);
+        (dir, stats)
     }
 
     pub fn suggest_move_guarantee(grid: &Vec<Vec<u32>>, usage: UsageMode) -> Option<Direction> {
+        Self::suggest_move_guarantee_with_stats(grid, usage).0
+    }
+
+    pub fn suggest_move_guarantee_with_stats(
+        grid: &Vec<Vec<u32>>,
+        usage: UsageMode,
+    ) -> (Option<Direction>, SearchStats) {
         let board = Self::flatten(grid);
         let distinct = bitboard_mod::count_distinct_tiles(&board);
         let base_depth = 3usize.max(distinct.saturating_sub(2));
         let final_depth = Self::endgame_depth(grid, base_depth);
-        Self::best_move(grid, final_depth, usage).0
+        Self::best_move_with_stats(grid, final_depth, usage, true)
     }
 
     pub(crate) fn ordered_directions(board: &[u32], n: usize) -> [(Direction, bool, f64); 4] {

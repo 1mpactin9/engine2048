@@ -6,6 +6,10 @@
 #include <string>
 #include <vector>
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 using namespace eng;
 
 struct Args
@@ -16,6 +20,8 @@ struct Args
     Weights w;
     bool reset_cache_each_game = false;
     bool verbose = false;
+    bool replay = false;
+    bool parallel_games = false;
 };
 
 static float argf(const char *v) { return float(atof(v)); }
@@ -67,6 +73,12 @@ static Args parse_args(int argc, char **argv)
             a.w.corner_weight = argf(next());
         else if (k == "--verbose")
             a.verbose = true;
+        else if (k == "--replay")
+            a.replay = true;
+        else if (k == "--parallel")
+            a.parallel_games = true;
+        else if (k == "--no-root-ordering")
+            a.cfg.use_root_ordering = false;
         else if (k == "--help")
         {
             printf("Usage: engine2048 [options]\n"
