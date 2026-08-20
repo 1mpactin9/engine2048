@@ -35,7 +35,7 @@ pub fn suggest_move(flat: &[u32], size: usize, depth: u32, usage_code: u32) -> u
         Some(depth as usize)
     };
     let usage = UsageMode::from_code(usage_code);
-    Engine::suggest_move_with_usage(&grid, depth_opt, usage).map_or(NO_MOVE, direction_code)
+    Engine::suggest_move_with_usage(&grid, depth_opt, usage).0.map_or(NO_MOVE, direction_code)
 }
 
 #[wasm_bindgen]
