@@ -1,12 +1,22 @@
 import type { Grid, MoveTranscript } from "../core/types";
 import { tileColor } from "../core/constants";
-
-const SLIDE_MS = 120;
+import {
+  AU,
+  Spring,
+  SpringRunner,
+  prefersReducedMotion,
+  resolveSpring,
+} from "./animate";
 
 interface TileRec {
   el: HTMLElement;
+  id: number;
   row: number;
   col: number;
+  // current animated transform state (driven by springs)
+  x: number;
+  y: number;
+  scale: number;
 }
 
 export interface SelectResult {
@@ -14,6 +24,9 @@ export interface SelectResult {
   col: number;
   id: number;
 }
+
+const MERGE_POP_PEAK = 1.18;
+const MERGE_POP_DURATION_MS = 180;
 
 export class BoardRenderer {
   readonly el: HTMLElement;
@@ -25,6 +38,7 @@ export class BoardRenderer {
   private gap = 10;
   private cellSize = 0;
   private ro: ResizeObserver;
+  private currentRunner: SpringRunner | null = null;
   private selectMode: {
     max: number;
     onSelected: (cells: SelectResult[]) => void;
@@ -75,19 +89,31 @@ export class BoardRenderer {
     this.cellSize = (inner - this.gap * (this.size - 1)) / this.size;
     this.el.style.setProperty("--gap", `${this.gap}px`);
     this.el.style.setProperty("--cell", `${this.cellSize}px`);
-    for (const rec of this.tiles.values()) this.positionTile(rec);
+    // If no animation is in flight, snap each tile to its grid cell.
+    // Otherwise the running springs are already driving them to the
+    // (about-to-be-correct) targets and re-snapshotting would jitter.
+    if (this.currentRunner === null) {
+      for (const rec of this.tiles.values()) {
+        rec.x = this.targetX(rec);
+        rec.y = this.targetY(rec);
+        this.applyTransform(rec);
+      }
+    }
   }
 
-  private positionTile(rec: TileRec): void {
-    const tx = rec.col * (this.cellSize + this.gap);
-    const ty = rec.row * (this.cellSize + this.gap);
-    rec.el.style.setProperty("--tx", `${tx}px`);
-    rec.el.style.setProperty("--ty", `${ty}px`);
-    rec.el.dataset.row = String(rec.row);
-    rec.el.dataset.col = String(rec.col);
+  private targetX(rec: TileRec): number {
+    return rec.col * (this.cellSize + this.gap);
   }
 
-  private faceForValue(value: number): { face: HTMLElement } {
+  private targetY(rec: TileRec): number {
+    return rec.row * (this.cellSize + this.gap);
+  }
+
+  private applyTransform(rec: TileRec): void {
+    rec.el.style.transform = `translate3d(${rec.x}px, ${rec.y}px, 0) scale(${rec.scale})`;
+  }
+
+  private faceForValue(value: number): HTMLElement {
     const face = document.createElement("div");
     face.className = "tile__face";
     const digits = Math.min(6, String(value).length);
@@ -96,7 +122,7 @@ export class BoardRenderer {
     face.style.setProperty("--tile-bg", bg);
     face.style.setProperty("--tile-fg", fg);
     face.textContent = String(value);
-    return { face };
+    return face;
   }
 
   private createTile(
@@ -109,16 +135,23 @@ export class BoardRenderer {
     const el = document.createElement("div");
     el.className = "tile";
     el.dataset.id = String(id);
-    const { face } = this.faceForValue(value);
-    if (spawn) face.classList.add("is-spawn");
-    el.appendChild(face);
+    el.appendChild(this.faceForValue(value));
     this.tilesLayer.appendChild(el);
-    const rec: TileRec = { el, row, col };
-    this.positionTile(rec);
+    const rec: TileRec = {
+      el,
+      id,
+      row,
+      col,
+      x: this.targetX({ row, col } as TileRec),
+      y: this.targetY({ row, col } as TileRec),
+      // New tiles start at scale 0 so the spring-driven grow from 0→1 is
+      // visible. Non-spawn tiles render at full size immediately.
+      scale: spawn ? 0 : 1,
+    };
+    this.applyTransform(rec);
     this.tiles.set(id, rec);
-    if (spawn) {
-      setTimeout(() => face.classList.remove("is-spawn"), 320);
-    }
+    el.dataset.row = String(row);
+    el.dataset.col = String(col);
     return rec;
   }
 
@@ -132,7 +165,31 @@ export class BoardRenderer {
     face.textContent = String(value);
   }
 
+  private pulseMerge(rec: TileRec): void {
+    // "Pop" after a merge: scale 1 → MERGE_POP_PEAK → 1, driven by two
+    // spring stages on a fresh runner so it doesn't tangle with the
+    // slide runner that just settled.
+    const runner = new SpringRunner();
+    const cfg = resolveSpring({ duration: MERGE_POP_DURATION_MS, bounce: 0.7 });
+    const up = new Spring(rec.scale, MERGE_POP_PEAK, cfg);
+    runner.add(up, (v) => {
+      rec.scale = v;
+      this.applyTransform(rec);
+    });
+    runner.start(0, () => {
+      const back = new Spring(rec.scale, 1, resolveSpring(AU));
+      const r2 = new SpringRunner();
+      r2.add(back, (v) => {
+        rec.scale = v;
+        this.applyTransform(rec);
+      });
+      r2.start();
+    });
+  }
+
   clearTiles(): void {
+    this.currentRunner?.stop();
+    this.currentRunner = null;
     for (const rec of this.tiles.values()) rec.el.remove();
     this.tiles.clear();
   }
@@ -149,58 +206,185 @@ export class BoardRenderer {
   }
 
   animateMove(transcript: MoveTranscript): void {
-    const removeIds = new Set<number>();
+    if (!transcript.moved) return;
+    this.currentRunner?.stop();
+
+    // Accessibility: when the user prefers reduced motion, snap every
+    // moving tile to its target and skip the spring entirely.
+    if (prefersReducedMotion()) {
+      for (const m of transcript.moves) {
+        const rec = this.tiles.get(m.id);
+        if (!rec) continue;
+        rec.row = m.toRow;
+        rec.col = m.toCol;
+        rec.x = this.targetX(rec);
+        rec.y = this.targetY(rec);
+        rec.el.dataset.row = String(m.toRow);
+        rec.el.dataset.col = String(m.toCol);
+        if (m.mergedInto !== undefined) rec.scale = 0;
+        this.applyTransform(rec);
+        if (m.newValue !== undefined) this.updateFace(rec, m.newValue);
+      }
+      for (const m of transcript.moves) {
+        if (m.mergedInto !== undefined) {
+          const rec = this.tiles.get(m.id);
+          if (rec) {
+            rec.el.remove();
+            this.tiles.delete(m.id);
+          }
+        }
+      }
+      if (transcript.spawned) {
+        const s = transcript.spawned;
+        const rec = this.createTile(s.id, s.value, s.row, s.col, true);
+        rec.scale = 1;
+        this.applyTransform(rec);
+      }
+      return;
+    }
+
+    const runner = new SpringRunner();
+    this.currentRunner = runner;
+
     const survivorUpdates: { id: number; value: number }[] = [];
+    const removableIds: number[] = [];
+    const hasMerge = transcript.moves.some((m) => m.mergedInto !== undefined);
 
     for (const m of transcript.moves) {
       const rec = this.tiles.get(m.id);
       if (!rec) continue;
       rec.row = m.toRow;
       rec.col = m.toCol;
-      this.positionTile(rec);
+      rec.el.dataset.row = String(m.toRow);
+      rec.el.dataset.col = String(m.toCol);
+
+      const cfg = resolveSpring(AU);
+      // Position springs — slide each tile to its new cell.
+      const xSpring = new Spring(rec.x, this.targetX(rec), cfg);
+      const ySpring = new Spring(rec.y, this.targetY(rec), cfg);
+      runner.add(xSpring, (v) => {
+        rec.x = v;
+        this.applyTransform(rec);
+      });
+      runner.add(ySpring, (v) => {
+        rec.y = v;
+        this.applyTransform(rec);
+      });
+
       if (m.mergedInto !== undefined) {
-        removeIds.add(m.id);
+        // The other tile will survive; this one shrinks to nothing alongside
+        // the slide so the merge looks like a collision.
+        const scaleSpring = new Spring(rec.scale, 0, cfg);
+        runner.add(scaleSpring, (v) => {
+          rec.scale = v;
+          this.applyTransform(rec);
+        });
+        removableIds.push(m.id);
       } else if (m.newValue !== undefined) {
         survivorUpdates.push({ id: m.id, value: m.newValue });
       }
     }
 
+    // Spawned tile: appears at the spawn cell, scales 0 → 1. If a merge
+    // happened this move, fast-forward 50ms so the spawn visually "lands"
+    // right as the shrinking merged tiles vanish (matches Au.elapsed = -50
+    // in the source).
+    let spawnedRec: TileRec | null = null;
     if (transcript.spawned) {
       const s = transcript.spawned;
-      this.createTile(s.id, s.value, s.row, s.col, true);
+      spawnedRec = this.createTile(s.id, s.value, s.row, s.col, true);
+      const scaleCfg = resolveSpring(AU);
+      const scaleSpring = new Spring(0, 1, scaleCfg);
+      runner.add(scaleSpring, (v) => {
+        spawnedRec!.scale = v;
+        this.applyTransform(spawnedRec!);
+      });
     }
 
-    window.setTimeout(() => {
+    runner.start(hasMerge ? -50 : 0, () => {
+      // Finalize: update face values for survivors, then remove dead tiles.
       for (const { id, value } of survivorUpdates) {
         const rec = this.tiles.get(id);
-        if (!rec) continue;
-        this.updateFace(rec, value);
-        const face = rec.el.firstElementChild as HTMLElement;
-        face.classList.add("is-merge");
-        window.setTimeout(() => face.classList.remove("is-merge"), 220);
+        if (rec) {
+          this.updateFace(rec, value);
+          this.pulseMerge(rec);
+        }
       }
-      for (const id of removeIds) {
+      for (const id of removableIds) {
         const rec = this.tiles.get(id);
         if (rec) {
           rec.el.remove();
           this.tiles.delete(id);
         }
       }
-    }, SLIDE_MS);
+      if (this.currentRunner === runner) this.currentRunner = null;
+    });
   }
 
   animateSwap(idA: number, idB: number): void {
     const a = this.tiles.get(idA);
     const b = this.tiles.get(idB);
     if (!a || !b) return;
-    const row = a.row;
-    const col = a.col;
+    this.currentRunner?.stop();
+
+    if (prefersReducedMotion()) {
+      const rowA = a.row;
+      const colA = a.col;
+      a.row = b.row;
+      a.col = b.col;
+      b.row = rowA;
+      b.col = colA;
+      a.x = this.targetX(a);
+      a.y = this.targetY(a);
+      b.x = this.targetX(b);
+      b.y = this.targetY(b);
+      a.el.dataset.row = String(a.row);
+      a.el.dataset.col = String(a.col);
+      b.el.dataset.row = String(b.row);
+      b.el.dataset.col = String(b.col);
+      this.applyTransform(a);
+      this.applyTransform(b);
+      return;
+    }
+
+    const runner = new SpringRunner();
+    this.currentRunner = runner;
+
+    const rowA = a.row;
+    const colA = a.col;
     a.row = b.row;
     a.col = b.col;
-    b.row = row;
-    b.col = col;
-    this.positionTile(a);
-    this.positionTile(b);
+    b.row = rowA;
+    b.col = colA;
+    a.el.dataset.row = String(a.row);
+    a.el.dataset.col = String(a.col);
+    b.el.dataset.row = String(b.row);
+    b.el.dataset.col = String(b.col);
+
+    const cfg = resolveSpring({ duration: 220, bounce: 0.3 });
+    const ax = new Spring(a.x, this.targetX(a), cfg);
+    const ay = new Spring(a.y, this.targetY(a), cfg);
+    const bx = new Spring(b.x, this.targetX(b), cfg);
+    const by = new Spring(b.y, this.targetY(b), cfg);
+    runner.add(ax, (v) => {
+      a.x = v;
+      this.applyTransform(a);
+    });
+    runner.add(ay, (v) => {
+      a.y = v;
+      this.applyTransform(a);
+    });
+    runner.add(bx, (v) => {
+      b.x = v;
+      this.applyTransform(b);
+    });
+    runner.add(by, (v) => {
+      b.y = v;
+      this.applyTransform(b);
+    });
+    runner.start(0, () => {
+      if (this.currentRunner === runner) this.currentRunner = null;
+    });
   }
 
   enterSelectMode(
@@ -254,6 +438,7 @@ export class BoardRenderer {
   };
 
   destroy(): void {
+    this.currentRunner?.stop();
     this.ro.disconnect();
   }
 }

@@ -38,37 +38,44 @@
   pointer-events: auto;
 }
 
-.board.is-frozen .board__tiles {
-  filter: saturate(0.82) brightness(0.97);
+.board.is-disabled .board__tiles {
+  filter: saturate(0.35) brightness(1.02);
+  transition: filter 0.25s ease;
 }
 
-.board.is-frozen::after {
+.board.is-disabled::after {
   content: "";
   position: absolute;
   inset: 0;
   border-radius: inherit;
-  background: linear-gradient(
-    135deg,
-    rgba(170, 200, 255, 0.18),
-    rgba(220, 235, 255, 0.05)
-  );
-  backdrop-filter: blur(1.5px) saturate(0.85);
-  -webkit-backdrop-filter: blur(1.5px) saturate(0.85);
+  background: var(--board-disabled-veil);
   pointer-events: none;
   z-index: 5;
-  animation: freeze-in 0.3s ease-out;
+  animation: disabled-in 0.25s ease-out;
 }
 
-/* ---------- Tiles ---------- */
+@keyframes disabled-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- Tiles ----------
+ * Position and scale are driven from JS via the spring-physics runner
+ * (see ui/animate.ts). CSS only owns the layout box, the face styling,
+ * the throb, and the select-mode pulse. --tx/--ty are no longer used. */
 .tile {
   position: absolute;
   top: 0;
   left: 0;
   width: var(--cell, 0px);
   height: var(--cell, 0px);
-  transform: translate(var(--tx, 0px), var(--ty, 0px));
-  transition: transform 0.12s ease;
+  transform-origin: center;
   will-change: transform;
+  /* No CSS transition — JS springs drive translate3d/scale per rAF. */
 }
 
 .tile__face {
@@ -104,35 +111,6 @@
 }
 .tile__face--d6 {
   --ff: 0.16;
-}
-
-.tile__face.is-spawn {
-  animation: tile-spawn 0.14s ease-out;
-}
-
-.tile__face.is-merge {
-  animation: tile-pop 0.14s ease-out;
-}
-
-@keyframes tile-spawn {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
-}
-
-@keyframes tile-pop {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
 }
 
 @keyframes throb {
@@ -188,13 +166,9 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .tile {
-    transition: none;
-  }
-  .tile__face.is-spawn,
-  .tile__face.is-merge,
   .tile.is-targetable .tile__face,
-  .score-box__value.is-bump {
+  .score-box__value.is-bump,
+  .animate-throb {
     animation: none;
   }
   .score-reel {

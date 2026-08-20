@@ -1,0 +1,12 @@
+[package]
+name = "engine-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "engine-cli"
+path = "src/main.rs"
+
+[dependencies]
+engine2048 = { path = "../engine" }
+crossterm = "0.29"

@@ -19,6 +19,16 @@ impl Direction {
         Direction::Left,
         Direction::Right,
     ];
+
+    /// Return a 0-3 index for this direction, matching the ordering in `ALL`.
+    pub(crate) fn index_from(dir: &Direction) -> usize {
+        match dir {
+            Direction::Up => 0,
+            Direction::Down => 1,
+            Direction::Left => 2,
+            Direction::Right => 3,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -401,7 +411,7 @@ impl Engine {
         depth: Option<usize>,
         usage: crate::UsageMode,
     ) -> Option<Direction> {
-        Self::suggest_move_with_usage(&self.grid, depth, usage)
+        Self::suggest_move_with_usage(&self.grid, depth, usage).0
     }
 
     pub fn suggest_move_for_guarantee(&self, usage: crate::UsageMode) -> Option<Direction> {

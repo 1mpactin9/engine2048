@@ -66,7 +66,7 @@ describe("BoardRenderer — fullRender", () => {
     teardown();
   });
 
-  it("spawn flag adds is-spawn class", () => {
+  it("spawn flag starts the tile at scale 0 (spring grows it to 1)", () => {
     const { board, teardown } = setup();
     board.setSize(4);
     const grid = [[{ id: 1, value: 2 }]];
@@ -74,8 +74,12 @@ describe("BoardRenderer — fullRender", () => {
     grid.push(new Array(4).fill(null));
     grid.push(new Array(4).fill(null));
     board.fullRender(grid as never, true);
-    const face = board.el.querySelector(".tile .tile__face");
-    expect(face?.classList.contains("is-spawn")).toBe(true);
+    const tile = board.el.querySelector(".tile") as HTMLElement;
+    // JS applies transform: translate3d(Xpx, Ypx, 0) scale(<S>).
+    // Spawn → S=0, so the matrix collapses to 0 — read it back from the
+    // computed transform via getPropertyValue (style transform) to avoid
+    // the matrix-format returned by getComputedStyle.
+    expect(tile.style.transform).toMatch(/scale\(0\)/);
     teardown();
   });
 });

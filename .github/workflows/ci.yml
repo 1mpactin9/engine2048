@@ -2,56 +2,34 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, engine-rework]
   pull_request:
     branches: [main]
 
 jobs:
-  js-tests:
-    runs-on: ubuntu-latest
+  build-test:
+    name: ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macOS-latest]
+
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
+    - name: Configure (CMake)
+      working-directory: engine-next
+      run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 
-      - name: Install dependencies
-        run: npm ci
+    - name: Build
+      working-directory: engine-next
+      run: cmake --build build --config Release --parallel
 
-      - name: Run tests
-        run: npm test
+    - name: Run tests
+      working-directory: engine-next
+      run: ctest --test-dir build --output-on-failure
 
-  rust-tests:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Cache cargo registry
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('engine/Cargo.lock') }}
-
-      - name: Run tests
-        run: cargo test --manifest-path engine/Cargo.toml
-
-  wasm-build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
-      - name: Build WASM
-        run: wasm-pack build --target web --release engine
+    - name: Smoke test
+      working-directory: engine-next/build
+      run: ./engine2048 --games 2 --seed 1 --max-depth 5 && ./test_correctness

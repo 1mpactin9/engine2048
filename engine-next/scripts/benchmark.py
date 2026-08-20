@@ -20,6 +20,7 @@ WEIGHT_FLAGS = {
     "merges_weight": "--merges-weight",
     "empty_weight": "--empty-weight",
     "corner_weight": "--corner-weight",
+    "adjacent_empty_weight": "--empty-adjacent-weight",
 }
 
 SUMMARY_RE = re.compile(

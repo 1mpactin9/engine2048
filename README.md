@@ -74,6 +74,7 @@ This project is licensed under the GNU General Public License v3.0.
 This project interacts with the following external open-source tools:
 
 - [game-difficulty/2048EndgameTablebase](https://github.com/game-difficulty/2048EndgameTablebase) - Licensed under GPL-3.0
+- [gabrielecirulli/2048](https://github.com/gabrielecirulli/2048) - Licensed under MIT
 - [nneonneo/2048-ai](https://github.com/nneonneo/2048-ai) - Licensed under MIT
 - [ziap/2048-ai](https://github.com/ziap/2048-ai) - Licensed under MIT
 

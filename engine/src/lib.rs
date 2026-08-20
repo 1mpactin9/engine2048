@@ -7,6 +7,8 @@ mod deterministic;
 mod usage;
 mod eval;
 mod eval_tracker;
+mod history;
+mod stats;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm;
@@ -17,6 +19,8 @@ pub use deterministic::SeedRng;
 pub use eval::{EvalConfig, EvalMode, EvalResult, eval_cache_size, clear_eval_cache};
 pub use eval_tracker::EvalTracker;
 pub use transposition::set_tt_bits;
+pub use history::HistoryTable;
+pub use stats::SearchStats;
 
 #[cfg(test)]
 mod tests {
