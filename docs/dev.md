@@ -37,7 +37,6 @@
 - [Auto-Play Engine](#auto-play-engine)
 - [RNG & Spawn System](#rng--spawn-system)
 - [Persistence Model](#persistence-model)
-- [Backtrack (Unlimited Undo)](#backtrack-unlimited-undo)
 - [CSS Custom Properties](#css-custom-properties)
 
 ## Project Structure
@@ -115,14 +114,14 @@ Central type definitions. No implementation, only interfaces and type aliases:
 | `DIRECTIONS` | Readonly array of all four directions |
 | `Cell` | `{ id: number, value: number }` — a single tile |
 | `Grid` | `(Cell \| null)[][]` — row-major 2D array |
-| `GameMode` | `'standard' \| 'classic'` |
-| `PowerupType` | `'undo' \| 'swap' \| 'delete'` |
-| `Powerups` | `{ undo: number, swap: number, delete: number }` |
+| `GameMode` | `'standard' \| 'classic' \| 'plus'` |
+| `PowerupType` | `'undo' \| 'swap' \| 'delete' \| 'teleport' \| 'rotate' \| 'bomb'` |
+| `Powerups` | `{ undo, swap, delete, teleport, rotate, bomb: number }` |
 | `TileMove` | Transcript entry for one tile's journey during a move |
 | `SpawnedTile` | A newly spawned tile with position info |
 | `MoveTranscript` | Result of a move: moved flag, tile moves, spawn, score gained |
 | `GameSnapshot` | Immutable snapshot for undo (grid, score, powerups, won, over, moveCount) |
-| `GameState` | Full mutable game state including RNG seed/calls |
+| `GameState` | Full mutable game state, including `undoLocked` and RNG seed/calls |
 | `EngineContext` | Read-only view handed to auto-play engines |
 | `AutoAction` | Union type: move, swap, delete, or stop |
 | `Engine` | Interface: `{ name, chooseAction(ctx): AutoAction \| Promise<AutoAction> }` |
@@ -136,12 +135,14 @@ Central type definitions. No implementation, only interfaces and type aliases:
 | `DEFAULT_MODE` | `'standard'` | Default game mode |
 | `WIN_VALUE` | `2048` | Tile value that triggers win banner |
 | `SPAWN_PROB_4` | `0.1` | 10% chance a new tile is 4 (else 2) |
-| `POWERUP_QUOTA` | `{ undo: 2, swap: 2, delete: 2 }` | Starting charges per Standard game |
-| `MAX_HISTORY` | `16` | Bounded undo history count (powerup undo). Backtrack via delta history extends this to ~2000 steps when enabled in settings. |
+| `STANDARD_START` / `PLUS_START` | `Powerups` | Starting charges per mode. Classic starts with none. |
+| `STANDARD_CAP` / `PLUS_CAP` | `Partial<Powerups>` | Per-powerup cap for each mode |
+| `STANDARD_UNLOCKS` / `PLUS_UNLOCKS` | `[tileValue, powerup][]` | Tile milestones (128/256/512) that grant +1 of a powerup, capped |
+| `MAX_HISTORY` | `5` | Rolling snapshot window for the Undo powerup |
 | `TILE_COLORS` | `Record<number, {bg, fg}>` | Per-value CSS variable references |
 | `SUPER_TILE` | `{ bg: var(--tile-super-bg), fg: var(--tile-super-fg) }` | Fallback for values above 2048 |
 | `tileColor(value)` | Returns `{bg, fg}` | Lookup helper; falls back to SUPER_TILE |
-| `gameKey(size, mode)` | `"${size}:${mode}"` | Storage key builder |
+| `gameKey(mode)` | `"${mode}"` | Storage key builder — one save slot per mode |
 
 ### Grid (`src/core/grid.ts`)
 
@@ -193,7 +194,7 @@ The transcript contains:
 | `GameSession.newGame(size, mode?, best?, rng?, manipulate?)` | Static factory. Creates a fresh session, advances the RNG for 2 starting tiles, returns the session. |
 | `restoreSession(state, rng?)` | Rehydrate a persisted `GameState` into a live `GameSession`. Fixes the tile ID counter. |
 | `session.applyMove(dir)` | Applies a directional move: slides/merges, spawns a tile, checks win/game-over. Returns `MoveTranscript` or null if no-move. |
-| `session.undo()` | Pops the last snapshot from history, restores grid/score/powerups, pays one undo charge. Returns true on success. Only works in Standard mode with available charges. |
+| `session.undo()` | Pops the last snapshot from history, restores grid/score/powerups, pays one undo charge. Returns true on success. Not available in Classic mode, and locked immediately after use — any subsequent move clears the lock. |
 | `session.swap(r1, c1, r2, c2)` | Swaps two occupied tiles. Pays one swap charge. Records history. |
 | `session.deleteTile(row, col)` | Removes a tile. Pays one delete charge. Records history. |
 | `session.acknowledgeWin()` | Dismisses the win banner; player keeps playing. |
@@ -208,7 +209,7 @@ The transcript contains:
 | `canSwap` | `boolean` | Has charges + Standard mode |
 | `canDelete` | `boolean` | Has charges + Standard mode |
 
-**History:** Each `applyMove`, `swap`, and `deleteTile` pushes a `GameSnapshot` onto `history` before mutating state. `undo` pops it. History is capped at `MAX_HISTORY` (16) entries for powerup undo. For unlimited backtrack, `deltaHistory` stores compressed delta-encoded steps (capped at 2000), enabled via the Backtrack toggle in settings. Undo itself is not recorded in history (cannot be "undone").
+**History:** Each mutating action (`applyMove`, `swap`, `deleteTile`, `teleport`, `rotateRing`, `bomb`, `deleteByValue`) pushes a `GameSnapshot` onto `history` before mutating state, capped at `MAX_HISTORY` (5) entries — enough to back up the Undo powerup, not a general-purpose rewind. `undo` pops the most recent snapshot and locks itself (`state.undoLocked`) until the next move is made, so it can't be chained. Undo itself is not recorded in history (cannot be "undone").
 
 ### Storage (`src/core/storage.ts`)
 
@@ -216,7 +217,7 @@ localStorage persistence layer:
 
 | Export | Description |
 |--------|-------------|
-| `load()` | Reads from localStorage (`"2048:v1"` key). Returns `StoredData` with settings, games map, and nextId. Handles version mismatches and parse errors by returning fresh data. |
+| `load()` | Reads from localStorage (`"2048:v2"` key). Returns `StoredData` with settings, one game per mode, and nextId. Tolerates parse errors, older versions, and individually malformed game entries by normalizing or dropping just that entry rather than wiping everything. |
 | `save(data)` | Serializes `StoredData` to JSON and writes to localStorage. Silently fails on quota exceeded. |
 | `getGame(data, size, mode)` | Reads a saved `GameState` by key. |
 | `putGame(data, state)` | Writes a `GameState` into the games map. |
@@ -234,7 +235,7 @@ interface StoredData {
 interface Settings {
   theme: 'light' | 'dark' | 'system';
   lastSize: number;
-  lastMode: 'standard' | 'classic';
+  lastMode: 'standard' | 'classic' | 'plus';
   autoOn: boolean;
   autoSpeed: number;      // ms between auto moves
   autoDepth: number;      // AI search depth override (0 = adaptive)
@@ -342,11 +343,13 @@ The central controller. Orchestrates all game state, UI updates, and user intera
 | `resumeGame()` | Restores the previous in-progress game when "Resume" is clicked. |
 | `powerupUndo()` | Spends an undo charge to revert the last move. |
 | `powerupSwap()` | Enters select mode for swapping two tiles. |
-| `powerupDelete()` | Enters select mode for deleting one tile. |
+| `powerupDelete()` | Enters select mode; deletes every tile matching the selected tile's value (costs one charge per tile cleared). |
+| `powerupTeleport()` | Enters select mode for moving a tile into an empty cell. Plus mode only. |
+| `powerupRotate(direction)` | Shifts the outer ring of tiles one step left or right. Plus mode only; disabled before the first move. |
+| `powerupBomb()` | Enters select mode; clears the 3x3 area centered on the selected cell. Plus mode only. |
 | `cancelPowerup()` | Exits select mode, disarms powerup selection. |
-| `updateUI()` | Syncs all UI elements: scores (with odometer animation), mode badge, powerup buttons, armed state, frozen indicator. |
+| `updateUI()` | Syncs all UI elements: scores (with odometer animation), mode badge, powerup buttons, armed state, frozen/disabled indicator. |
 | `handleWinOver()` | Shows win overlay (2048 reached) or game-over overlay (no moves left). Skips modal during auto-play. |
-| `runAutoLoop(targetScore)` | Starts the AI engine looping until score reaches target. Exposed on `window.dev.runAutoLoop`. |
 | `autoTick()` | The auto-play heartbeat: schedules next AI decision via `setTimeout`, applies result, loops. |
 | `applyAutoAction(action)` | Dispatches AI decisions: move, delete, swap, or stop (with auto-loop restart logic). |
 | `showOverlay(opts)` | Creates a modal dialog with title, message, score, and action buttons. |
@@ -358,10 +361,10 @@ The central controller. Orchestrates all game state, UI updates, and user intera
 - `this.data` — Loaded `StoredData` from localStorage
 - `this.session` — Live `GameSession` instance
 - `this.board` — `BoardRenderer` instance
-- `this.armed` — `'none' \| 'swap' \| 'delete'` — which powerup is currently selecting tiles
+- `this.armed` — `'none' \| 'swap' \| 'delete' \| 'teleport' \| 'bomb'` — which powerup is currently selecting tiles
 - `this.pendingNew` — True when a new game was started but the old one hasn't been committed yet (enables Resume)
 - `this.autoOn` — Whether the AI engine is actively playing
-- `this.autoLoopTarget` — Score target for `dev.runAutoLoop`; null = infinite play
+- `this.autoLoopTarget` — Optional score target the auto-play loop stops at; null = infinite play
 
 **Score animation:** Uses an odometer-style reel that rolls up or down depending on whether the score increased or decreased. On mode/size switches, force-rolling respects the navigation direction.
 
@@ -444,9 +447,8 @@ SVG icon strings used throughout the UI. Each icon is a small inline SVG path/st
 
 Bootstraps the application:
 
-1. Calls `boot()` which creates an `App` instance, clears any stale DOM (HMR safety), calls `app.start()`, and assigns it to `window.__app`.
-2. Exposes `window.dev` with all developer console methods, including `dev.runAutoLoop(score)` for engine looping.
-3. Sets up HMR disposal to clean up the old instance on hot reload.
+1. Calls `boot()` which creates an `App` instance, clears any stale DOM (HMR safety), calls `app.start()`, and assigns it to `window.__app` (used for HMR bookkeeping only — no developer console is exposed).
+2. Sets up HMR disposal to clean up the old instance on hot reload.
 
 ## Styling
 
@@ -589,75 +591,60 @@ Because the seedrandom stream is fully determined by `(seed, calls)`, the next s
 3. Reading the next `rng()` value for the position selection
 4. Reading the next `rng()` value for the value selection (2 vs 4)
 
-This is what `dev.nextNumber()` and `dev.nextLocation()` do internally.
+This same technique is used internally by the "Deterministic Algorithm" engine setting, which previews the next spawn's position and value before committing to a move.
 
 ## Persistence Model
 
 ### Storage Key
 
-All data is stored in localStorage under the key `"2048:v1"` (version 1).
+All data is stored in localStorage under the key `"2048:v2"` (version 2).
 
 ### Data Shape
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "settings": {
     "theme": "system",
     "lastSize": 4,
     "lastMode": "standard",
     "autoOn": false,
-    "autoSpeed": 180,
     "autoDepth": 0,
     "autoPowerups": true,
-    "rngManip": false
+    "rngManip": false,
+    "deterministic": false
   },
   "games": {
-    "4:standard": { /* GameState */ },
-    "4:classic": { /* GameState */ },
-    "5:standard": { /* GameState */ }
+    "standard": { /* GameState, size 4 */ },
+    "classic": { /* GameState, size 6 */ },
+    "plus": { /* GameState, size 4 */ }
   },
   "nextId": 42
 }
 ```
 
-Each game is keyed by `"${size}:${mode}"`. The `nextId` field ensures tile IDs never collide across games.
+Each game is keyed by mode only (`gameKey(mode)`), so there is exactly one save slot per mode. Changing board size for a mode starts a fresh board at that size within the same slot — it does not create a second slot. The `nextId` field ensures tile IDs never collide across games.
 
 ### Save Triggers
 
 Persistence is triggered after:
 - Every move (`applyMove` → `saveCurrent`)
-- Every powerup use (`undo`, `swap`, `deleteTile`)
+- Every powerup use (`undo`, `swap`, `deleteTile`/`deleteByValue`, `teleport`, `rotateRing`, `bomb`)
 - New game creation
 - Acknowledging a win
 - Settings changes (theme, auto-play, size, mode)
-- Developer console operations (all dev methods call `saveCurrent`)
 
 ### Load Triggers
 
 Data is loaded on:
 - Initial page load (`load()`)
-- Switching between size/mode combinations (other games are restored from storage)
+- Switching between modes (the target mode's saved game is restored from storage)
 - Resuming a previous game
+- An `onExternalChange` callback fires when another browser tab or window updates the same save, via the native `storage` event, so multiple open tabs stay in sync
 
 ### Version Migration
 
-If the stored version doesn't match `VERSION` (1), or parsing fails, `load()` returns fresh data — effectively a soft reset.
-
-## Backtrack (Unlimited Undo)
-
-The **Backtrack** toggle in the settings popover enables delta-encoded unlimited undo history. When enabled, every move is recorded as a compressed delta (only changed cells) alongside an anchor snapshot, allowing `dev.undo(n)` to step back far beyond the 16-snapshot powerup undo limit — up to 10000 steps per size/mode combo.
-
-**How it works:**
-- Each move stores: one full `GameSnapshot` (anchor) + a list of cell changes (deltas)
-- Delta encoding means each step uses ~10% of the space of a full-grid clone
-- The backtrack cache is stored in `GameState.deltaHistory` and persisted with the game
-- When you start a new game, the old game's data stays in storage under its `size:mode` key
-- Resume becomes unavailable after the first move on a new game — at that point the previous game's backtrack cache is no longer accessible unless you switch back to that size/mode
-
-**Disabling backtrack:** When you toggle backtrack off, you're prompted to either keep the stored data or clear it. "Keep & Disable" preserves the delta history in storage; "Clear & Disable" removes it. If you later want to use backtrack again, re-enable the toggle and a fresh delta history starts building.
-
-**Persistence:** The `backtrackEnabled` setting is saved in localStorage and restored across page reloads and game switches.
+`load()` does not discard everything on a version mismatch or a malformed entry. Settings are merged with defaults, and each entry in `games` is independently normalized — missing fields (like new powerup types) are filled with safe defaults, and an entry that isn't even shaped like a game is dropped without affecting the others. Only genuinely unparsable JSON falls back to a fresh slate.
 
 ## CSS Custom Properties
 
@@ -672,7 +659,15 @@ The **Backtrack** toggle in the settings popover enables delta-encoded unlimited
 
 ### Game-Over Bar
 
-The game-over indicator appears below the board when no moves remain. It slides in with a `freeze-in` animation (fade + slight upward motion). The "Play Again" button within uses the same gradient styling as the topbar primary button but with theme-adapted colors.
+The game-over indicator appears below the board when no moves remain. It slides in with a `fade-in-up` animation (fade + slight upward motion). The "Play Again" button within uses the same gradient styling as the topbar primary button but with theme-adapted colors.
+
+### Powerups Panel
+
+The powerups panel (`.powerups-panel`) is a single filled container using `--bg-powerups`, anchored to the bottom of the stage. It collapses to zero height and fades out in Classic mode (no powerups), which lets the board settle into a centered position without a separate layout mode. Each `.powerup-btn` uses `--accent` as its background and `--powerup-indicator` for its count badge; the disabled state uses the dedicated `--disabled-bg` / `--disabled-indicator` / `--disabled-text` tokens rather than opacity. When armed (`.is-armed`), a button lifts ~33% with a drop shadow and reveals a small circular cancel button (`.powerup-btn__cancel`) beneath it.
+
+### Plus-Mode Board
+
+`.board--plus` swaps the board's outer/inner colors to `--board-plus-outer` / `--board-plus-inner`, independent of the light/dark theme toggle — Plus mode's board always renders dark.
 
 ### Tile Colors
 

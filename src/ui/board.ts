@@ -41,6 +41,7 @@ export class BoardRenderer {
   private currentRunner: SpringRunner | null = null;
   private selectMode: {
     max: number;
+    emptyOk: boolean;
     onSelected: (cells: SelectResult[]) => void;
     picked: SelectResult[];
   } | null = null;
@@ -52,6 +53,7 @@ export class BoardRenderer {
 
     this.grid = document.createElement("div");
     this.grid.className = "board__grid";
+    this.grid.addEventListener("click", this.onCellClick);
 
     this.tilesLayer = document.createElement("div");
     this.tilesLayer.className = "board__tiles";
@@ -65,23 +67,46 @@ export class BoardRenderer {
   }
 
   setSize(n: number): void {
-    this.size = n;
-    this.el.style.setProperty("--n", String(n));
+    // Clamp to a known-good range so an out-of-range value can't produce a
+    // negative cellSize. Also defensively exit any in-progress select
+    // session — the picked cells and is-targetable classes from before the
+    // size change are no longer meaningful.
+    this.exitSelectMode();
+    const clamped = Math.max(2, Math.min(8, n | 0));
+    this.size = clamped;
+    this.el.style.setProperty("--n", String(clamped));
     this.grid.innerHTML = "";
     this.cells = [];
-    for (let i = 0; i < n * n; i++) {
+    for (let i = 0; i < clamped * clamped; i++) {
       const cell = document.createElement("div");
       cell.className = "cell";
+      cell.dataset.row = String(Math.floor(i / clamped));
+      cell.dataset.col = String(i % clamped);
       this.grid.appendChild(cell);
       this.cells.push(cell);
     }
     this.clearTiles();
     this.layout();
+    // If the board was 0-wide when setSize ran (e.g. the popover was
+    // open and the board was collapsed for a moment), the layout call
+    // above bailed out. Schedule a retry on the next frame so the
+    // freshly-created tiles get positioned once the board is measurable.
+    requestAnimationFrame(() => this.layout());
   }
 
   private layout(): void {
     const w = this.el.clientWidth;
-    if (w === 0) return;
+    if (w === 0) {
+      // Provide a sane fallback so the very first render isn't invisible
+      // and the spawn-tile scale-0→1 spring is visible immediately. The
+      // ResizeObserver will replace this with the real measurement on the
+      // next tick.
+      this.gap = 10;
+      this.cellSize = 100;
+      this.el.style.setProperty("--gap", `${this.gap}px`);
+      this.el.style.setProperty("--cell", `${this.cellSize}px`);
+      return;
+    }
     const ratio = this.size >= 8 ? 0.015 : 0.026;
     const minGap = this.size >= 8 ? 5 : 6;
     this.gap = Math.max(minGap, Math.round(w * ratio));
@@ -387,15 +412,151 @@ export class BoardRenderer {
     });
   }
 
+  /** Move a tile from one cell to another, sliding it across the board. */
+  animateTeleport(id: number, toRow: number, toCol: number): void {
+    const rec = this.tiles.get(id);
+    if (!rec) return;
+    this.currentRunner?.stop();
+
+    rec.row = toRow;
+    rec.col = toCol;
+    rec.el.dataset.row = String(toRow);
+    rec.el.dataset.col = String(toCol);
+
+    if (prefersReducedMotion()) {
+      rec.x = this.targetX(rec);
+      rec.y = this.targetY(rec);
+      this.applyTransform(rec);
+      return;
+    }
+
+    const runner = new SpringRunner();
+    this.currentRunner = runner;
+    const cfg = resolveSpring({ duration: 260, bounce: 0.35 });
+    const xSpring = new Spring(rec.x, this.targetX(rec), cfg);
+    const ySpring = new Spring(rec.y, this.targetY(rec), cfg);
+    runner.add(xSpring, (v) => {
+      rec.x = v;
+      this.applyTransform(rec);
+    });
+    runner.add(ySpring, (v) => {
+      rec.y = v;
+      this.applyTransform(rec);
+    });
+    runner.start(0, () => {
+      if (this.currentRunner === runner) this.currentRunner = null;
+    });
+  }
+
+  /** Slide every tile on the outer ring one step around, in tile-id order. */
+  animateRingShift(
+    moves: { id: number; row: number; col: number }[],
+  ): void {
+    this.currentRunner?.stop();
+
+    for (const m of moves) {
+      const rec = this.tiles.get(m.id);
+      if (!rec) continue;
+      rec.row = m.row;
+      rec.col = m.col;
+      rec.el.dataset.row = String(m.row);
+      rec.el.dataset.col = String(m.col);
+    }
+
+    if (prefersReducedMotion()) {
+      for (const m of moves) {
+        const rec = this.tiles.get(m.id);
+        if (!rec) continue;
+        rec.x = this.targetX(rec);
+        rec.y = this.targetY(rec);
+        this.applyTransform(rec);
+      }
+      return;
+    }
+
+    const runner = new SpringRunner();
+    this.currentRunner = runner;
+    const cfg = resolveSpring({ duration: 260, bounce: 0.3 });
+    for (const m of moves) {
+      const rec = this.tiles.get(m.id);
+      if (!rec) continue;
+      const xSpring = new Spring(rec.x, this.targetX(rec), cfg);
+      const ySpring = new Spring(rec.y, this.targetY(rec), cfg);
+      runner.add(xSpring, (v) => {
+        rec.x = v;
+        this.applyTransform(rec);
+      });
+      runner.add(ySpring, (v) => {
+        rec.y = v;
+        this.applyTransform(rec);
+      });
+    }
+    runner.start(0, () => {
+      if (this.currentRunner === runner) this.currentRunner = null;
+    });
+  }
+
+  /** Remove tiles (e.g. bomb, delete-by-value) with a quick shrink-out. */
+  animateClear(ids: number[]): void {
+    this.currentRunner?.stop();
+    const recs: TileRec[] = [];
+    for (const id of ids) {
+      const rec = this.tiles.get(id);
+      if (rec) recs.push(rec);
+    }
+    if (recs.length === 0) return;
+
+    if (prefersReducedMotion()) {
+      for (const rec of recs) {
+        rec.el.remove();
+        this.tiles.delete(rec.id);
+      }
+      return;
+    }
+
+    const runner = new SpringRunner();
+    this.currentRunner = runner;
+    const cfg = resolveSpring({ duration: 180, bounce: 0.1 });
+    for (const rec of recs) {
+      const scaleSpring = new Spring(rec.scale, 0, cfg);
+      runner.add(scaleSpring, (v) => {
+        rec.scale = v;
+        this.applyTransform(rec);
+      });
+    }
+    runner.start(0, () => {
+      for (const rec of recs) {
+        rec.el.remove();
+        this.tiles.delete(rec.id);
+      }
+      if (this.currentRunner === runner) this.currentRunner = null;
+    });
+  }
+
   enterSelectMode(
     max: number,
     onSelected: (cells: SelectResult[]) => void,
+    emptyOk = false,
   ): void {
     this.exitSelectMode();
-    this.selectMode = { max, onSelected, picked: [] };
+    this.selectMode = { max, emptyOk, onSelected, picked: [] };
     this.el.classList.add("is-selecting");
     for (const rec of this.tiles.values())
       rec.el.classList.add("is-targetable");
+    if (emptyOk) {
+      for (const cell of this.cells) {
+        if (!this.tileAt(cell)) cell.classList.add("is-targetable");
+      }
+    }
+  }
+
+  private tileAt(cell: HTMLElement): TileRec | null {
+    const row = Number(cell.dataset.row);
+    const col = Number(cell.dataset.col);
+    for (const rec of this.tiles.values()) {
+      if (rec.row === row && rec.col === col) return rec;
+    }
+    return null;
   }
 
   exitSelectMode(): void {
@@ -404,6 +565,9 @@ export class BoardRenderer {
     this.el.classList.remove("is-selecting");
     for (const rec of this.tiles.values()) {
       rec.el.classList.remove("is-targetable", "is-selected");
+    }
+    for (const cell of this.cells) {
+      cell.classList.remove("is-targetable", "is-selected");
     }
   }
 
@@ -420,16 +584,38 @@ export class BoardRenderer {
     const row = Number(tileEl.dataset.row);
     const col = Number(tileEl.dataset.col);
     if (Number.isNaN(row) || Number.isNaN(col)) return;
+    this.pickCell(row, col, Number(tileEl.dataset.id), tileEl);
+  };
 
+  private onCellClick = (e: MouseEvent): void => {
+    if (!this.selectMode?.emptyOk) return;
+    const cellEl = (e.target as HTMLElement).closest(
+      ".cell",
+    ) as HTMLElement | null;
+    if (!cellEl) return;
+    const row = Number(cellEl.dataset.row);
+    const col = Number(cellEl.dataset.col);
+    if (Number.isNaN(row) || Number.isNaN(col)) return;
+    if (this.tileAt(cellEl)) return;
+    this.pickCell(row, col, -1, cellEl);
+  };
+
+  private pickCell(
+    row: number,
+    col: number,
+    id: number,
+    el: HTMLElement,
+  ): void {
     const sm = this.selectMode;
+    if (!sm) return;
     const existing = sm.picked.findIndex((p) => p.row === row && p.col === col);
     if (existing >= 0) {
       sm.picked.splice(existing, 1);
-      tileEl.classList.remove("is-selected");
+      el.classList.remove("is-selected");
       return;
     }
-    sm.picked.push({ row, col, id: Number(tileEl.dataset.id) });
-    tileEl.classList.add("is-selected");
+    sm.picked.push({ row, col, id });
+    el.classList.add("is-selected");
     if (sm.picked.length >= sm.max) {
       const result = [...sm.picked];
       this.exitSelectMode();

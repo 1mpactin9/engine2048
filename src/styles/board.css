@@ -1,7 +1,7 @@
 .board {
   position: relative;
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
   aspect-ratio: 1;
   margin: 0 auto;
   background: var(--board-outer);
@@ -13,6 +13,15 @@
   -webkit-user-select: none;
 }
 
+.board--plus {
+  background: var(--board-plus-outer);
+}
+
+.board--plus .cell {
+  background: var(--board-plus-inner);
+  box-shadow: var(--board-plus-inner-shadow);
+}
+
 .board__grid {
   position: absolute;
   inset: var(--gap, 10px);
@@ -20,18 +29,37 @@
   grid-template-columns: repeat(var(--n, 4), 1fr);
   grid-template-rows: repeat(var(--n, 4), 1fr);
   gap: var(--gap, 10px);
+  z-index: 0;
 }
 
 .cell {
   background: var(--cell-bg);
   border-radius: calc(var(--gap, 10px) * 0.7);
   box-shadow: var(--board-inner-shadow);
+  transition:
+    outline-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.cell.is-targetable {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+  cursor: pointer;
+  animation: target-pulse 1.4s ease-in-out;
+  animation-iteration-count: 2;
+}
+
+.cell.is-selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+  animation: none;
 }
 
 .board__tiles {
   position: absolute;
   inset: var(--gap, 10px);
   pointer-events: none;
+  z-index: 1;
 }
 
 .board.is-selecting .board__tiles {
@@ -41,6 +69,14 @@
 .board.is-disabled .board__tiles {
   filter: saturate(0.35) brightness(1.02);
   transition: filter 0.25s ease;
+}
+
+/* Disabled wins over selecting: if the board is in a game-over state, do
+ * not let the user pick targets even if a leftover select session still
+ * thinks it is active. */
+.board.is-disabled.is-selecting .board__tiles {
+  pointer-events: none;
+  filter: saturate(0.35) brightness(1.02);
 }
 
 .board.is-disabled::after {
@@ -86,7 +122,7 @@
   justify-content: center;
   border-radius: calc(var(--gap, 10px) * 0.7);
   font-family: "Rubik", Arial, system-ui, sans-serif;
-  font-weight: 510;
+  font-weight: 500;
   font-size: calc(var(--cell, 20px) * var(--ff, 0.46));
   box-shadow: var(--shadow-tile);
   background: var(--tile-bg, #eee4da);
@@ -95,44 +131,30 @@
 }
 
 .tile__face--d1 {
-  --ff: 0.45;
+  --ff: 0.38;
 }
 .tile__face--d2 {
-  --ff: 0.42;
+  --ff: 0.38;
 }
 .tile__face--d3 {
-  --ff: 0.34;
+  --ff: 0.315;
 }
 .tile__face--d4 {
-  --ff: 0.25;
+  --ff: 0.26;
 }
 .tile__face--d5 {
-  --ff: 0.2;
+  --ff: 0.26;
 }
 .tile__face--d6 {
-  --ff: 0.16;
-}
-
-@keyframes throb {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-}
-
-.animate-throb {
-  animation: throb 1s infinite;
-  transform-origin: center;
+  --ff: 0.26;
 }
 
 .tile.is-targetable .tile__face {
   outline: 2px solid var(--accent);
   outline-offset: -3px;
   cursor: pointer;
-  animation: target-pulse 1.4s ease-in-out infinite;
+  animation: target-pulse 1.4s ease-in-out;
+  animation-iteration-count: 2;
 }
 
 .tile.is-selected .tile__face {
@@ -167,8 +189,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tile.is-targetable .tile__face,
-  .score-box__value.is-bump,
-  .animate-throb {
+  .score-box__value.is-bump {
     animation: none;
   }
   .score-reel {

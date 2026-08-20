@@ -357,12 +357,16 @@ export const KL = {
 
 /**
  * Au — tile animation preset.
- *  - duration 250ms, bounce 0.3
- *  - used for tile slide, merge, spawn, unspawn
+ *  - duration 250ms, bounce 0.15
+ *  - used for tile slide, merge spawn, unspawn
+ *  - bounce is intentionally low (~18% overshoot): a higher value made
+ *    tiles fly past their target cell by ~70% of a cell width, which
+ *    overlapped neighbouring tiles and made the board look like it was
+ *    breaking apart.
  */
 export const AU = {
   duration: 250,
-  bounce: 0.3,
+  bounce: 0.15,
 } as const;
 
 // ----- Reduced motion -----------------------------------------------------

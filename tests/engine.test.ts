@@ -9,7 +9,14 @@ function makeCtx(grid: number[][]): EngineContext {
     grid: gridFromValues(grid),
     size: grid.length,
     score: 0,
-    powerups: { undo: 0, swap: 0, delete: 0 },
+    powerups: {
+      undo: 0,
+      swap: 0,
+      delete: 0,
+      teleport: 0,
+      rotate: 0,
+      bomb: 0,
+    },
     depth: 2,
     usePowerups: false,
   };
