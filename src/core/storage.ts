@@ -100,8 +100,26 @@ export function load(): StoredData {
       const normalized = normalizeGame(value);
       if (normalized) games[key] = normalized;
     }
+    // Migration: older saves keyed by mode only (e.g. "plus"). Re-key them
+    // by `${mode}:${size}` so per-size saves don't clobber each other and
+    // older single-slot saves keep their data. Both the old and new key
+    // may briefly coexist; the new key wins on subsequent putGame.
+    const migrated: Record<string, GameState> = {};
+    for (const [key, state] of Object.entries(games)) {
+      if (key.includes(":")) {
+        migrated[key] = state;
+      } else {
+        const newKey = gameKey(state);
+        if (!migrated[newKey]) migrated[newKey] = state;
+      }
+    }
     setNextId((parsed.nextId ?? 1) + 1);
-    return { version: VERSION, settings, games, nextId: parsed.nextId ?? 1 };
+    return {
+      version: VERSION,
+      settings,
+      games: migrated,
+      nextId: parsed.nextId ?? 1,
+    };
   } catch {
     return freshData();
   }
@@ -130,13 +148,13 @@ export function onExternalChange(onChange: () => void): () => void {
 
 export function getGame(
   data: StoredData,
-  mode: GameMode,
+  state: { mode: GameMode; size: number },
 ): GameState | undefined {
-  return data.games[gameKey(mode)];
+  return data.games[gameKey(state)];
 }
 
 export function putGame(data: StoredData, state: GameState): void {
-  data.games[gameKey(state.mode)] = state;
+  data.games[gameKey(state)] = state;
 }
 
 export function clearGames(data: StoredData): void {

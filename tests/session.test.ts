@@ -474,4 +474,43 @@ describe("restoreSession", () => {
     expect(restored.state.size).toBe(4);
     expect(restored.state.score).toBe(original.state.score);
   });
+
+  it("re-grants unlocks implied by the saved max tile", () => {
+    // Simulate a save where the user reached 256 but the stored powerups
+    // lost the teleport charge (migrated/older schema). Re-loading the
+    // save should reconcile and grant the missing unlock.
+    const s = makeSession(
+      row0([256, 0, 0, 0]),
+      "plus",
+      undefined,
+      { teleport: 0 },
+    );
+    // The reconcile constructor only grants if the powerup is 0. Since we
+    // passed teleport: 0 above, it should be granted now.
+    expect(s.state.powerups.teleport).toBe(1);
+  });
+
+  it("does not re-grant unlocks that are already present", () => {
+    const s = makeSession(
+      row0([256, 0, 0, 0]),
+      "plus",
+      undefined,
+      { teleport: 1 },
+    );
+    expect(s.state.powerups.teleport).toBe(1);
+  });
+
+  it("undo after a milestone move does not double-debit undo", () => {
+    // Reach 128 via 64+64 merge (grants undo), then undo the move.
+    // The undo should only consume 1 charge, not 2.
+    const s = makeSession(row0([64, 64, 0, 0]), "standard", undefined, {
+      undo: 1,
+    });
+    s.applyMove("left");
+    // 64+64 → 128 grants an undo charge.
+    expect(s.state.powerups.undo).toBe(2);
+    // Undo the merge move. Without the fix this would go to 0.
+    s.undo();
+    expect(s.state.powerups.undo).toBe(1);
+  });
 });

@@ -78,6 +78,32 @@ export class GameSession {
       };
     }
     this.unlockedUpTo = maxTile(state.grid);
+    // A save from an older schema (or one whose powerups were lost to a
+    // migration / corruption) may have `maxTile` >= a milestone but
+    // `powerups[kind] === 0` for that milestone. Reconcile by granting
+    // any missing unlocks once at load time.
+    this.reconcileUnlocks();
+  }
+
+  /** Grant any milestones implied by the current `maxTile` that the
+   * saved `powerups` state is missing. Idempotent; only ever increases
+   * counts and only up to the per-mode cap. */
+  private reconcileUnlocks(): void {
+    const cap = capsFor(this.state.mode);
+    const unlocks = unlocksFor(this.state.mode);
+    if (unlocks.length === 0) return;
+    const top = maxTile(this.state.grid);
+    for (const [threshold, kind] of unlocks) {
+      if (threshold <= top && this.state.powerups[kind] === 0) {
+        const limit = cap[kind] ?? Infinity;
+        if (limit > 0) {
+          this.state.powerups[kind] = Math.min(
+            limit,
+            this.state.powerups[kind] + 1,
+          );
+        }
+      }
+    }
   }
 
   setRngManipulation(on: boolean): void {
@@ -159,7 +185,14 @@ export class GameSession {
     const unlocks = unlocksFor(this.state.mode);
     if (unlocks.length === 0) return;
     const top = maxTile(this.state.grid);
-    if (top <= this.unlockedUpTo) return;
+    if (top < this.unlockedUpTo) {
+      // The board shrank (e.g. via undo) — don't lose the high-water mark
+      // so we don't re-grant already-granted milestones. The undo path
+      // restores `unlockedUpTo` from the snapshot so the strict-`>`
+      // check below stays correct.
+      return;
+    }
+    if (top === this.unlockedUpTo) return;
     for (const [threshold, kind] of unlocks) {
       if (threshold > this.unlockedUpTo && threshold <= top) {
         const limit = cap[kind] ?? Infinity;
@@ -206,12 +239,17 @@ export class GameSession {
     if (this.state.history.length === 0) return false;
 
     const snap = this.state.history.pop()!;
+    // Restore the snapshot's grid, score, etc., but keep the *current*
+    // undo count and decrement by 1. Using the snapshot's undo count and
+    // subtracting 1 would double-debit when the undone move itself
+    // granted an undo charge (e.g. reaching 128). The consumed charge is
+    // the undo action itself, not whatever changed during the move.
     this.state.grid = snap.grid;
     this.state.score = snap.score;
     this.state.won = snap.won;
     this.state.wonAcknowledged = snap.wonAcknowledged;
     this.state.moveCount = snap.moveCount;
-    this.state.powerups = { ...snap.powerups, undo: snap.powerups.undo - 1 };
+    this.state.powerups = { ...snap.powerups, undo: this.state.powerups.undo - 1 };
     this.state.undoLocked = true;
     this.unlockedUpTo = maxTile(this.state.grid);
     this.recomputeOver();

@@ -67,25 +67,46 @@ export class BoardRenderer {
   }
 
   setSize(n: number): void {
-    this.size = n;
-    this.el.style.setProperty("--n", String(n));
+    // Clamp to a known-good range so an out-of-range value can't produce a
+    // negative cellSize. Also defensively exit any in-progress select
+    // session — the picked cells and is-targetable classes from before the
+    // size change are no longer meaningful.
+    this.exitSelectMode();
+    const clamped = Math.max(2, Math.min(8, n | 0));
+    this.size = clamped;
+    this.el.style.setProperty("--n", String(clamped));
     this.grid.innerHTML = "";
     this.cells = [];
-    for (let i = 0; i < n * n; i++) {
+    for (let i = 0; i < clamped * clamped; i++) {
       const cell = document.createElement("div");
       cell.className = "cell";
-      cell.dataset.row = String(Math.floor(i / n));
-      cell.dataset.col = String(i % n);
+      cell.dataset.row = String(Math.floor(i / clamped));
+      cell.dataset.col = String(i % clamped);
       this.grid.appendChild(cell);
       this.cells.push(cell);
     }
     this.clearTiles();
     this.layout();
+    // If the board was 0-wide when setSize ran (e.g. the popover was
+    // open and the board was collapsed for a moment), the layout call
+    // above bailed out. Schedule a retry on the next frame so the
+    // freshly-created tiles get positioned once the board is measurable.
+    requestAnimationFrame(() => this.layout());
   }
 
   private layout(): void {
     const w = this.el.clientWidth;
-    if (w === 0) return;
+    if (w === 0) {
+      // Provide a sane fallback so the very first render isn't invisible
+      // and the spawn-tile scale-0→1 spring is visible immediately. The
+      // ResizeObserver will replace this with the real measurement on the
+      // next tick.
+      this.gap = 10;
+      this.cellSize = 100;
+      this.el.style.setProperty("--gap", `${this.gap}px`);
+      this.el.style.setProperty("--cell", `${this.cellSize}px`);
+      return;
+    }
     const ratio = this.size >= 8 ? 0.015 : 0.026;
     const minGap = this.size >= 8 ? 5 : 6;
     this.gap = Math.max(minGap, Math.round(w * ratio));

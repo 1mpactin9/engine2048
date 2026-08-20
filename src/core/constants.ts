@@ -96,6 +96,6 @@ export function tileColor(value: number): { bg: string; fg: string } {
   return TILE_COLORS[value] ?? SUPER_TILE;
 }
 
-export function gameKey(mode: string): string {
-  return mode;
+export function gameKey(state: { mode: string; size: number }): string {
+  return `${state.mode}:${state.size}`;
 }

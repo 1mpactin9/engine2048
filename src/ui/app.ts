@@ -289,7 +289,9 @@ export class App {
 
   private loadGame(size: number, mode: GameMode, forceNew = false): void {
     this.mode = mode;
-    const saved = !forceNew ? getGame(this.data, mode) : undefined;
+    const saved = !forceNew
+      ? getGame(this.data, { mode, size })
+      : undefined;
     let state: GameState;
     if (saved) {
       state = saved;
@@ -310,10 +312,10 @@ export class App {
     this.session.setRngManipulation(this.data.settings.rngManip);
     this.session.setUsageMode(this.data.settings.usageMode);
     this.pendingNew = false;
+    this.wasOver = false;
     this.board.setSize(this.size);
     this.board.fullRender(this.session.state.grid, !saved);
     this.updateUI();
-    this.wasOver = this.session.state.over;
     this.handleWinOver();
   }
 
@@ -332,7 +334,7 @@ export class App {
     // resumes that mode's saved game (or starts one) at its own size.
     if (sizeChanged) {
       const best = modeChanged
-        ? (getGame(this.data, mode)?.best ?? 0)
+        ? (getGame(this.data, { mode, size })?.best ?? 0)
         : this.session.state.best;
       this.mode = mode;
       this.session = GameSession.newGame(
@@ -406,13 +408,14 @@ export class App {
     this.wasOver = false;
     this.pendingNew = !prevOver;
     if (!this.pendingNew) this.saveCurrent();
+    this.board.setSize(this.size);
     this.board.fullRender(this.session.state.grid, true);
     this.updateUI();
   }
 
   private resumeGame(): void {
     if (!this.pendingNew) return;
-    const saved = getGame(this.data, this.mode);
+    const saved = getGame(this.data, { mode: this.mode, size: this.size });
     if (!saved || saved.over || saved.moveCount === 0) {
       this.pendingNew = false;
       this.updatePrimaryButton();
@@ -447,16 +450,18 @@ export class App {
     this.armed = "swap";
     this.board.enterSelectMode(2, (cells) => {
       if (cells.length === 2) {
-        this.session.swap(
+        const ok = this.session.swap(
           cells[0].row,
           cells[0].col,
           cells[1].row,
           cells[1].col,
         );
-        this.saveCurrent();
-        this.board.animateSwap(cells[0].id, cells[1].id);
+        if (ok) {
+          this.saveCurrent();
+          this.board.animateSwap(cells[0].id, cells[1].id);
+          this.armed = "none";
+        }
       }
-      this.armed = "none";
       this.updateUI();
     });
     this.updateUI();
@@ -479,13 +484,14 @@ export class App {
             .flat()
             .filter((c) => c?.value === value)
             .map((c) => c!.id);
-          if (this.session.deleteByValue(value) > 0) {
+          const cleared = this.session.deleteByValue(value);
+          if (cleared > 0) {
             this.saveCurrent();
             this.board.animateClear(ids);
+            this.armed = "none";
           }
         }
       }
-      this.armed = "none";
       this.updateUI();
     });
     this.updateUI();
@@ -504,12 +510,18 @@ export class App {
       (cells) => {
         if (cells.length === 2) {
           const [from, to] = cells;
-          if (this.session.teleport(from.row, from.col, to.row, to.col)) {
+          const ok = this.session.teleport(
+            from.row,
+            from.col,
+            to.row,
+            to.col,
+          );
+          if (ok) {
             this.saveCurrent();
             this.board.animateTeleport(from.id, to.row, to.col);
+            this.armed = "none";
           }
         }
-        this.armed = "none";
         this.updateUI();
       },
       true,
@@ -518,7 +530,11 @@ export class App {
   }
 
   private powerupRotate(direction: "left" | "right"): void {
-    if (!this.session.canRotate || this.board.isSelecting) return;
+    if (this.board.isSelecting) {
+      this.cancelPowerup();
+      return;
+    }
+    if (!this.session.canRotate) return;
     this.stopAuto();
     this.clearPendingNew();
     const n = this.size;
@@ -530,7 +546,10 @@ export class App {
     const grid = this.session.state.grid;
     const before = ring.map((p) => grid[p.row][p.col]);
 
-    if (!this.session.rotateRing(direction)) return;
+    if (!this.session.rotateRing(direction)) {
+      this.updateUI();
+      return;
+    }
     this.saveCurrent();
 
     const shift = direction === "right" ? 1 : -1;
@@ -558,8 +577,8 @@ export class App {
         if (center && this.session.bomb(center.row, center.col)) {
           this.saveCurrent();
           this.board.fullRender(this.session.state.grid);
+          this.armed = "none";
         }
-        this.armed = "none";
         this.updateUI();
       },
       true,
@@ -641,9 +660,31 @@ export class App {
         this.session.canTeleport,
         "teleport",
       );
-      setPower(this.rotateLeftBtn, s.powerups.rotate, this.session.canRotate);
-      setPower(this.rotateRightBtn, s.powerups.rotate, this.session.canRotate);
+      setPower(
+        this.rotateLeftBtn,
+        s.powerups.rotate,
+        this.session.canRotate,
+        null,
+      );
+      setPower(
+        this.rotateRightBtn,
+        s.powerups.rotate,
+        this.session.canRotate,
+        null,
+      );
       setPower(this.bombBtn, s.powerups.bomb, this.session.canBomb, "bomb");
+    } else {
+      // Keep hidden Plus buttons' internal state fresh so the next
+      // mode-switch snap is correct.
+      setPower(
+        this.teleportBtn,
+        s.powerups.teleport,
+        false,
+        null,
+      );
+      setPower(this.rotateLeftBtn, s.powerups.rotate, false, null);
+      setPower(this.rotateRightBtn, s.powerups.rotate, false, null);
+      setPower(this.bombBtn, s.powerups.bomb, false, null);
     }
   }
 

@@ -81,7 +81,9 @@ describe("load — fresh data", () => {
     );
     const loaded = load();
     expect(loaded.settings.theme).toBe("dark");
-    expect(loaded.games.standard).toBeDefined();
+    // The migration re-keys old single-slot saves from "standard" to
+    // "standard:4" using the state's size.
+    expect(loaded.games["standard:4"]).toBeDefined();
   });
 
   it("drops individually malformed game entries but keeps the rest", () => {
@@ -97,8 +99,8 @@ describe("load — fresh data", () => {
       }),
     );
     const loaded = load();
-    expect(loaded.games.standard).toBeDefined();
-    expect(loaded.games.classic).toBeUndefined();
+    expect(loaded.games["standard:4"]).toBeDefined();
+    expect(loaded.games["classic"]).toBeUndefined();
   });
 
   it("fills missing settings with defaults", () => {
@@ -129,7 +131,7 @@ describe("load — fresh data", () => {
       }),
     );
     const loaded = load();
-    expect(loaded.games.standard.powerups).toEqual({
+    expect(loaded.games["standard:4"].powerups).toEqual({
       undo: 1,
       swap: 0,
       delete: 0,
@@ -146,8 +148,8 @@ describe("save / load round-trip", () => {
       version: 2,
       settings: { ...DEFAULT_SETTINGS, theme: "dark", lastSize: 6 },
       games: {
-        standard: { ...makeState(4, "standard"), score: 100 },
-        classic: { ...makeState(6, "classic"), score: 200 },
+        "standard:4": { ...makeState(4, "standard"), score: 100 },
+        "classic:6": { ...makeState(6, "classic"), score: 200 },
       },
       nextId: 5,
     };
@@ -155,8 +157,8 @@ describe("save / load round-trip", () => {
     const loaded = load();
     expect(loaded.settings.theme).toBe("dark");
     expect(loaded.settings.lastSize).toBe(6);
-    expect(getGame(loaded, "standard")!.score).toBe(100);
-    expect(getGame(loaded, "classic")!.score).toBe(200);
+    expect(getGame(loaded, { mode: "standard", size: 4 })!.score).toBe(100);
+    expect(getGame(loaded, { mode: "classic", size: 6 })!.score).toBe(200);
   });
 });
 
@@ -169,8 +171,8 @@ describe("getGame / putGame / clearGames", () => {
       nextId: 1,
     };
     putGame(data, { ...makeState(), score: 42 });
-    expect(getGame(data, "standard")!.score).toBe(42);
-    expect(getGame(data, "classic")).toBeUndefined();
+    expect(getGame(data, { mode: "standard", size: 4 })!.score).toBe(42);
+    expect(getGame(data, { mode: "classic", size: 4 })).toBeUndefined();
   });
 
   it("putGame with a new size overwrites the same mode's slot", () => {
@@ -182,28 +184,56 @@ describe("getGame / putGame / clearGames", () => {
     };
     putGame(data, { ...makeState(4, "standard"), score: 1 });
     putGame(data, { ...makeState(6, "standard"), score: 2 });
-    expect(getGame(data, "standard")!.score).toBe(2);
-    expect(getGame(data, "standard")!.size).toBe(6);
-    expect(Object.keys(data.games)).toEqual(["standard"]);
+    // With the per-size key, both sizes now have their own slot.
+    expect(getGame(data, { mode: "standard", size: 4 })!.score).toBe(1);
+    expect(getGame(data, { mode: "standard", size: 6 })!.score).toBe(2);
+    expect(getGame(data, { mode: "standard", size: 6 })!.size).toBe(6);
+    expect(Object.keys(data.games)).toEqual(["standard:4", "standard:6"]);
   });
 
   it("clearGames wipes all games", () => {
     const data: StoredData = {
       version: 2,
       settings: { ...DEFAULT_SETTINGS },
-      games: { standard: makeState() },
+      games: { "standard:4": makeState() },
       nextId: 42,
     };
     clearGames(data);
     expect(data.games).toEqual({});
     expect(data.settings.theme).toBe(DEFAULT_SETTINGS.theme);
   });
+
+  it("loads old single-key saves and re-keys them by mode:size", () => {
+    // Simulate a save written before the per-size key was introduced.
+    localStorage.setItem(
+      KEY,
+      JSON.stringify({
+        version: 2,
+        settings: {},
+        games: {
+          standard: makeState(4, "standard"),
+          classic: makeState(4, "classic"),
+          plus: makeState(6, "plus"),
+        },
+      }),
+    );
+    const loaded = load();
+    expect(loaded.games["standard:4"]).toBeDefined();
+    expect(loaded.games["classic:4"]).toBeDefined();
+    expect(loaded.games["plus:6"]).toBeDefined();
+    // Old single-key slots must not survive alongside the migrated key.
+    expect(loaded.games["standard"]).toBeUndefined();
+    expect(loaded.games["classic"]).toBeUndefined();
+    expect(loaded.games["plus"]).toBeUndefined();
+  });
 });
 
 describe("gameKey", () => {
-  it("keys by mode only, so one save slot exists per mode", () => {
-    expect(gameKey("standard")).toBe("standard");
-    expect(gameKey("classic")).toBe("classic");
-    expect(gameKey("standard")).not.toBe(gameKey("classic"));
+  it("keys by mode+size, so one save slot exists per mode+size", () => {
+    expect(gameKey({ mode: "standard", size: 4 })).toBe("standard:4");
+    expect(gameKey({ mode: "classic", size: 4 })).toBe("classic:4");
+    expect(gameKey({ mode: "standard", size: 4 })).not.toBe(
+      gameKey({ mode: "standard", size: 6 }),
+    );
   });
 });
