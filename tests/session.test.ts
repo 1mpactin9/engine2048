@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
-import type { GameMode, GameState } from "../src/core/types";
-import { POWERUP_QUOTA } from "../src/core/constants";
+import type { GameMode, GameState, Powerups } from "../src/core/types";
+import {
+  PLUS_START,
+  STANDARD_START,
+} from "../src/core/constants";
 import { gridFromValues, gridToValues } from "../src/core/grid";
 import { GameSession, restoreSession } from "../src/core/session";
 
@@ -20,17 +23,30 @@ function row0(row: number[]): number[][] {
   return grid;
 }
 
+const EMPTY_POWERUPS: Powerups = {
+  undo: 0,
+  swap: 0,
+  delete: 0,
+  teleport: 0,
+  rotate: 0,
+  bomb: 0,
+};
+
+function startingPowerups(mode: GameMode): Powerups {
+  if (mode === "standard") return { ...STANDARD_START };
+  if (mode === "plus") return { ...PLUS_START };
+  return { ...EMPTY_POWERUPS };
+}
+
 function makeSession(
   values: number[][],
   mode: GameMode = "standard",
   rng?: () => number,
+  powerupsOverride?: Partial<Powerups>,
 ): GameSession {
   const grid = gridFromValues(values);
   const size = values.length;
-  const powerups =
-    mode === "standard"
-      ? { ...POWERUP_QUOTA }
-      : { undo: 0, swap: 0, delete: 0 };
+  const powerups = { ...startingPowerups(mode), ...powerupsOverride };
   const state: GameState = {
     size,
     mode,
@@ -43,7 +59,7 @@ function makeSession(
     over: false,
     history: [],
     moveCount: 0,
-    deltaHistory: [],
+    undoLocked: false,
   };
   return new GameSession(state, rng);
 }
@@ -54,17 +70,22 @@ describe("GameSession.newGame", () => {
     expect(s.state.grid.flat().filter(Boolean).length).toBe(2);
   });
 
-  it("starts with full powerup quota in standard, zero in classic", () => {
+  it("starts with the right powerup quota per mode", () => {
     expect(GameSession.newGame(4, "standard").state.powerups).toEqual({
+      ...EMPTY_POWERUPS,
       undo: 2,
-      swap: 2,
-      delete: 2,
+      swap: 1,
     });
-    expect(GameSession.newGame(4, "classic").state.powerups).toEqual({
-      undo: 0,
-      swap: 0,
-      delete: 0,
+    expect(GameSession.newGame(4, "plus").state.powerups).toEqual({
+      ...EMPTY_POWERUPS,
+      undo: 2,
+      swap: 1,
+      teleport: 1,
+      rotate: 1,
     });
+    expect(GameSession.newGame(4, "classic").state.powerups).toEqual(
+      EMPTY_POWERUPS,
+    );
   });
 
   it("respects custom board sizes and best score", () => {
@@ -129,10 +150,19 @@ describe("GameSession.applyMove", () => {
     s.applyMove("left");
     expect(s.state.moveCount).toBe(1);
   });
+
+  it("clears the undo lock whenever a move is made", () => {
+    const s = makeSession(row0([2, 0, 2, 0]));
+    s.applyMove("left");
+    s.undo();
+    expect(s.state.undoLocked).toBe(true);
+    s.applyMove("left");
+    expect(s.state.undoLocked).toBe(false);
+  });
 });
 
-describe("GameSession — powerups", () => {
-  it("undo reverts the last move and consumes a charge", () => {
+describe("GameSession — undo", () => {
+  it("reverts the last move and consumes a charge", () => {
     const s = makeSession(row0([2, 0, 2, 0]));
     s.applyMove("left");
     expect(s.undo()).toBe(true);
@@ -141,7 +171,7 @@ describe("GameSession — powerups", () => {
     expect(s.state.score).toBe(0);
   });
 
-  it("undo fails with no charge, no history, or in classic mode", () => {
+  it("fails with no charge, no history, or in classic mode", () => {
     const s = makeSession(row0([2, 0, 2, 0]));
     expect(s.undo()).toBe(false);
     s.state.powerups.undo = 0;
@@ -152,36 +182,207 @@ describe("GameSession — powerups", () => {
     expect(classic.undo()).toBe(false);
   });
 
-  it("swap exchanges two occupied cells and consumes a charge", () => {
+  it("cannot be used twice in a row, but a move resets the lock", () => {
+    const s = makeSession(row0([2, 0, 2, 0]), "standard", undefined, {
+      undo: 2,
+    });
+    s.applyMove("left");
+    expect(s.undo()).toBe(true);
+    expect(s.canUndo).toBe(false);
+    expect(s.undo()).toBe(false);
+    // Board is back to its pre-move state, so "left" is a no-op here —
+    // use a move that actually changes the board to clear the lock.
+    s.applyMove("right");
+    expect(s.state.undoLocked).toBe(false);
+  });
+});
+
+describe("GameSession — swap", () => {
+  it("exchanges two occupied cells and consumes a charge", () => {
     const s = makeSession([
       [2, 4],
       [0, 0],
     ]);
     expect(s.swap(0, 0, 0, 1)).toBe(true);
-    expect(s.state.powerups.swap).toBe(1);
+    expect(s.state.powerups.swap).toBe(0);
     expect(gridToValues(s.state.grid)).toEqual([
       [4, 2],
       [0, 0],
     ]);
   });
 
-  it("swap refuses empty cells, same cell, or classic mode", () => {
-    const s = makeSession([
-      [2, 0],
-      [0, 0],
-    ]);
+  it("refuses empty cells, same cell, or classic mode", () => {
+    const s = makeSession(
+      [
+        [2, 0],
+        [0, 0],
+      ],
+      "standard",
+      undefined,
+      { swap: 1 },
+    );
     expect(s.swap(0, 0, 0, 1)).toBe(false);
     expect(s.swap(0, 0, 0, 0)).toBe(false);
     const classic = makeSession(row0([2, 0, 2, 0]), "classic");
     expect(classic.swap(0, 0, 0, 2)).toBe(false);
   });
+});
 
-  it("delete removes a tile and consumes a charge", () => {
-    const s = makeSession([
-      [2, 4],
+describe("GameSession — delete", () => {
+  it("removes a tile and consumes a charge", () => {
+    const s = makeSession(
+      [
+        [2, 4],
+        [0, 0],
+      ],
+      "plus",
+      undefined,
+      { delete: 1 },
+    );
+    expect(s.deleteTile(0, 1)).toBe(true);
+    expect(s.state.powerups.delete).toBe(0);
+    expect(gridToValues(s.state.grid)).toEqual([
+      [2, 0],
       [0, 0],
     ]);
-    expect(s.deleteTile(0, 1)).toBe(true);
+  });
+
+  it("refuses empty cells, classic mode, or zero charges", () => {
+    const s = makeSession(row0([2, 0, 2, 0]), "plus", undefined, {
+      delete: 1,
+    });
+    expect(s.deleteTile(0, 1)).toBe(false);
+    s.state.powerups.delete = 0;
+    expect(s.deleteTile(0, 0)).toBe(false);
+  });
+});
+
+describe("GameSession — teleport", () => {
+  it("moves a tile into an empty cell in plus mode only", () => {
+    const s = makeSession(
+      [
+        [2, 0],
+        [0, 0],
+      ],
+      "plus",
+      undefined,
+      { teleport: 1 },
+    );
+    expect(s.teleport(0, 0, 1, 1)).toBe(true);
+    expect(s.state.powerups.teleport).toBe(0);
+    expect(gridToValues(s.state.grid)).toEqual([
+      [0, 0],
+      [0, 2],
+    ]);
+  });
+
+  it("refuses an occupied destination, empty source, or non-plus mode", () => {
+    const s = makeSession(
+      [
+        [2, 4],
+        [0, 0],
+      ],
+      "plus",
+      undefined,
+      { teleport: 1 },
+    );
+    expect(s.teleport(0, 0, 0, 1)).toBe(false);
+    expect(s.teleport(1, 0, 1, 1)).toBe(false);
+    const standard = makeSession(
+      [
+        [2, 0],
+        [0, 0],
+      ],
+      "standard",
+      undefined,
+      { teleport: 1 },
+    );
+    expect(standard.teleport(0, 0, 1, 1)).toBe(false);
+  });
+
+  it("canTeleport is false once the board is full", () => {
+    const s = makeSession(
+      [
+        [2, 4],
+        [8, 16],
+      ],
+      "plus",
+      undefined,
+      { teleport: 1 },
+    );
+    expect(s.canTeleport).toBe(false);
+  });
+});
+
+describe("GameSession — rotateRing", () => {
+  it("shifts the outer ring one step and consumes a charge", () => {
+    const s = makeSession(
+      [
+        [2, 4],
+        [8, 16],
+      ],
+      "plus",
+      undefined,
+      { rotate: 1 },
+    );
+    s.state.moveCount = 1;
+    expect(s.rotateRing("right")).toBe(true);
+    expect(s.state.powerups.rotate).toBe(0);
+    expect(gridToValues(s.state.grid)).toEqual([
+      [8, 2],
+      [16, 4],
+    ]);
+  });
+
+  it("cannot be used before the first move", () => {
+    const s = makeSession(
+      [
+        [2, 4],
+        [8, 16],
+      ],
+      "plus",
+      undefined,
+      { rotate: 1 },
+    );
+    expect(s.rotateRing("right")).toBe(false);
+  });
+});
+
+describe("GameSession — bomb", () => {
+  it("clears a 3x3 area clipped to the board edges", () => {
+    const s = makeSession(
+      [
+        [2, 4, 8],
+        [16, 32, 64],
+        [128, 256, 512],
+      ],
+      "plus",
+      undefined,
+      { bomb: 1 },
+    );
+    expect(s.bomb(0, 0)).toBe(true);
+    expect(s.state.powerups.bomb).toBe(0);
+    expect(gridToValues(s.state.grid)).toEqual([
+      [0, 0, 8],
+      [0, 0, 64],
+      [128, 256, 512],
+    ]);
+  });
+});
+
+describe("GameSession — deleteByValue", () => {
+  it("costs one use per matching tile: a single match drains one use", () => {
+    const s = makeSession(
+      [
+        [2, 4],
+        [0, 0],
+      ],
+      "plus",
+      undefined,
+      { delete: 2 },
+    );
+    const cleared = s.deleteByValue(4);
+    expect(cleared).toBe(1);
     expect(s.state.powerups.delete).toBe(1);
     expect(gridToValues(s.state.grid)).toEqual([
       [2, 0],
@@ -189,11 +390,59 @@ describe("GameSession — powerups", () => {
     ]);
   });
 
-  it("delete refuses empty cells, classic mode, or zero charges", () => {
-    const s = makeSession(row0([2, 0, 2, 0]));
-    expect(s.deleteTile(0, 1)).toBe(false);
-    s.state.powerups.delete = 0;
-    expect(s.deleteTile(0, 0)).toBe(false);
+  it("two matching tiles drain both uses", () => {
+    const s = makeSession(
+      [
+        [4, 4],
+        [0, 0],
+      ],
+      "plus",
+      undefined,
+      { delete: 2 },
+    );
+    const cleared = s.deleteByValue(4);
+    expect(cleared).toBe(2);
+    expect(s.state.powerups.delete).toBe(0);
+    expect(gridToValues(s.state.grid)).toEqual([
+      [0, 0],
+      [0, 0],
+    ]);
+  });
+
+  it("only clears as many tiles as there are charges available", () => {
+    const s = makeSession(
+      [
+        [4, 4],
+        [0, 0],
+      ],
+      "plus",
+      undefined,
+      { delete: 1 },
+    );
+    expect(s.deleteByValue(4)).toBe(0);
+    expect(s.state.powerups.delete).toBe(1);
+    expect(gridToValues(s.state.grid)).toEqual([
+      [4, 4],
+      [0, 0],
+    ]);
+  });
+});
+
+describe("GameSession — powerup unlocks", () => {
+  it("grants a standard-mode powerup on reaching its tile milestone", () => {
+    const s = makeSession(row0([64, 64, 0, 0]), "standard", undefined, {
+      undo: 0,
+    });
+    s.applyMove("left");
+    expect(s.state.powerups.undo).toBe(1);
+  });
+
+  it("does not grant powerups past a mode's cap", () => {
+    const s = makeSession(row0([64, 64, 0, 0]), "standard", undefined, {
+      undo: 2,
+    });
+    s.applyMove("left");
+    expect(s.state.powerups.undo).toBe(2);
   });
 });
 
@@ -224,28 +473,5 @@ describe("restoreSession", () => {
     const restored = restoreSession(original.state);
     expect(restored.state.size).toBe(4);
     expect(restored.state.score).toBe(original.state.score);
-  });
-
-  it("initializes deltaHistory if missing", () => {
-    const grid = gridFromValues([
-      [2, 0],
-      [0, 4],
-    ]);
-    const state: GameState = {
-      size: 2,
-      mode: "standard",
-      grid,
-      score: 0,
-      best: 0,
-      powerups: { ...POWERUP_QUOTA },
-      won: false,
-      wonAcknowledged: false,
-      over: false,
-      history: [],
-      moveCount: 0,
-    };
-    const s = restoreSession(state);
-    expect(s.state.deltaHistory).toBeDefined();
-    expect(Array.isArray(s.state.deltaHistory)).toBe(true);
   });
 });

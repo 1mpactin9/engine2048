@@ -1,4 +1,5 @@
 import type { ThemePref } from "../core/storage";
+import type { GameMode } from "../core/types";
 import { SIZES } from "../core/constants";
 import { Icons } from "./icons";
 import type { UsageMode } from "../core/usage";
@@ -78,9 +79,7 @@ export interface PopoverOpts {
   autoPowerups: boolean;
   rngManip: boolean;
   deterministic: boolean;
-  backtrackEnabled: boolean;
-  onBacktrack: (on: boolean) => void;
-  mode: "standard" | "classic";
+  mode: GameMode;
   size: number;
   onTheme: (pref: ThemePref) => void;
   onAuto: (on: boolean) => void;
@@ -89,9 +88,9 @@ export interface PopoverOpts {
   onAutoPowerups: (on: boolean) => void;
   onRngManip: (on: boolean) => void;
   onDeterministic: (on: boolean) => void;
-  onMode: (mode: "standard" | "classic") => void;
+  onMode: (mode: GameMode) => void;
   onSize: (size: number) => void;
-  onClearAll: (isBacktrackPrompt?: boolean) => void;
+  onClearAll: () => void;
 }
 
 export class SettingsPopover {
@@ -100,7 +99,6 @@ export class SettingsPopover {
   private autoSwitch!: HTMLElement;
   private rngSwitch!: HTMLElement;
   private detSwitch!: HTMLElement;
-  private backtrackSwitch!: HTMLElement;
   private powerupSwitch!: HTMLElement;
   private powerupRow!: HTMLElement;
   private themeSeg!: {
@@ -177,11 +175,12 @@ export class SettingsPopover {
 
     this.modeSeg = createSegmented(
       [
-        { label: "Standard", value: "standard" },
         { label: "Classic", value: "classic" },
+        { label: "Standard", value: "standard" },
+        { label: "Plus", value: "plus" },
       ],
       this.opts.mode,
-      (v) => this.opts.onMode(v as "standard" | "classic"),
+      (v) => this.opts.onMode(v as GameMode),
     );
 
     const sizeLabel = document.createElement("div");
@@ -312,35 +311,6 @@ export class SettingsPopover {
     usageField.className = "popover__field";
     usageField.append(usageLabel, this.usageSeg.el);
 
-    const backtrackRow = document.createElement("div");
-    backtrackRow.className = "popover__row";
-    const backtrackLabel = document.createElement("span");
-    backtrackLabel.textContent = "Backtrack";
-    backtrackLabel.className = "popover__row-label";
-    const backtrackSwitch = document.createElement("button");
-    backtrackSwitch.type = "button";
-    backtrackSwitch.className =
-      "switch" + (this.opts.backtrackEnabled ? " is-on" : "");
-    backtrackSwitch.setAttribute(
-      "aria-label",
-      "Toggle backtrack (unlimited undo)",
-    );
-    backtrackSwitch.setAttribute(
-      "aria-pressed",
-      String(this.opts.backtrackEnabled),
-    );
-    backtrackSwitch.addEventListener("click", () => {
-      if (this.opts.backtrackEnabled) {
-        this.popover.hidden = true;
-        this.open = false;
-        this.opts.onClearAll(true);
-      } else {
-        this.opts.onBacktrack(true);
-      }
-    });
-    this.backtrackSwitch = backtrackSwitch;
-    backtrackRow.append(backtrackLabel, backtrackSwitch);
-
     const powerupRow = document.createElement("div");
     powerupRow.className = "popover__row";
     const powerupLabel = document.createElement("span");
@@ -365,7 +335,6 @@ export class SettingsPopover {
       detRow,
       depthField,
       usageField,
-      backtrackRow,
       powerupRow,
     );
     this.applyPowerupVisibility();
@@ -506,13 +475,6 @@ export class SettingsPopover {
     if (opts.deterministic !== undefined) {
       this.detSwitch.classList.toggle("is-on", opts.deterministic);
       this.detSwitch.setAttribute("aria-pressed", String(opts.deterministic));
-    }
-    if (opts.backtrackEnabled !== undefined) {
-      this.backtrackSwitch.classList.toggle("is-on", opts.backtrackEnabled);
-      this.backtrackSwitch.setAttribute(
-        "aria-pressed",
-        String(opts.backtrackEnabled),
-      );
     }
   }
 }

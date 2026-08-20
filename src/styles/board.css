@@ -1,7 +1,7 @@
 .board {
   position: relative;
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
   aspect-ratio: 1;
   margin: 0 auto;
   background: var(--board-outer);
@@ -11,6 +11,15 @@
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+
+.board--plus {
+  background: var(--board-plus-outer);
+}
+
+.board--plus .cell {
+  background: var(--board-plus-inner);
+  box-shadow: var(--board-plus-inner-shadow);
 }
 
 .board__grid {
@@ -26,6 +35,22 @@
   background: var(--cell-bg);
   border-radius: calc(var(--gap, 10px) * 0.7);
   box-shadow: var(--board-inner-shadow);
+  transition:
+    outline-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.cell.is-targetable {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+  cursor: pointer;
+  animation: target-pulse 1.4s ease-in-out infinite;
+}
+
+.cell.is-selected {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+  animation: none;
 }
 
 .board__tiles {
@@ -86,7 +111,7 @@
   justify-content: center;
   border-radius: calc(var(--gap, 10px) * 0.7);
   font-family: "Rubik", Arial, system-ui, sans-serif;
-  font-weight: 510;
+  font-weight: 500;
   font-size: calc(var(--cell, 20px) * var(--ff, 0.46));
   box-shadow: var(--shadow-tile);
   background: var(--tile-bg, #eee4da);
@@ -95,37 +120,22 @@
 }
 
 .tile__face--d1 {
-  --ff: 0.45;
+  --ff: 0.38;
 }
 .tile__face--d2 {
-  --ff: 0.42;
+  --ff: 0.38;
 }
 .tile__face--d3 {
-  --ff: 0.34;
+  --ff: 0.315;
 }
 .tile__face--d4 {
-  --ff: 0.25;
+  --ff: 0.26;
 }
 .tile__face--d5 {
-  --ff: 0.2;
+  --ff: 0.26;
 }
 .tile__face--d6 {
-  --ff: 0.16;
-}
-
-@keyframes throb {
-  0%,
-  100% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-}
-
-.animate-throb {
-  animation: throb 1s infinite;
-  transform-origin: center;
+  --ff: 0.26;
 }
 
 .tile.is-targetable .tile__face {
@@ -167,8 +177,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .tile.is-targetable .tile__face,
-  .score-box__value.is-bump,
-  .animate-throb {
+  .score-box__value.is-bump {
     animation: none;
   }
   .score-reel {

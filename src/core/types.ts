@@ -11,14 +11,23 @@ export interface Cell {
 
 export type Grid = (Cell | null)[][];
 
-export type GameMode = "standard" | "classic";
+export type GameMode = "standard" | "classic" | "plus";
 
-export type PowerupType = "undo" | "swap" | "delete";
+export type PowerupType =
+  | "undo"
+  | "swap"
+  | "delete"
+  | "teleport"
+  | "rotate"
+  | "bomb";
 
 export interface Powerups {
   undo: number;
   swap: number;
   delete: number;
+  teleport: number;
+  rotate: number;
+  bomb: number;
 }
 
 export interface TileMove {
@@ -55,17 +64,6 @@ export interface GameSnapshot {
   moveCount: number;
 }
 
-export interface CellDelta {
-  row: number;
-  col: number;
-  cell: { id: number; value: number } | null;
-}
-
-export interface HistoryStep {
-  anchor: GameSnapshot;
-  deltas: CellDelta[];
-}
-
 export interface GameState {
   size: number;
   mode: GameMode;
@@ -78,7 +76,7 @@ export interface GameState {
   over: boolean;
   history: GameSnapshot[];
   moveCount: number;
-  deltaHistory?: HistoryStep[];
+  undoLocked: boolean;
   rngSeed?: number[];
   rngCalls?: number;
   usageMode?: UsageMode;

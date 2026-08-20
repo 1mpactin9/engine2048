@@ -10,9 +10,59 @@ export const WIN_VALUE = 2048;
 
 export const SPAWN_PROB_4 = 0.1;
 
-export const POWERUP_QUOTA: Powerups = { undo: 2, swap: 2, delete: 2 };
+/** Starting powerup counts per mode. Classic gets none. */
+export const STANDARD_START: Powerups = {
+  undo: 2,
+  swap: 1,
+  delete: 0,
+  teleport: 0,
+  rotate: 0,
+  bomb: 0,
+};
 
-export const MAX_HISTORY = 16;
+export const PLUS_START: Powerups = {
+  undo: 2,
+  swap: 1,
+  teleport: 1,
+  rotate: 1,
+  delete: 0,
+  bomb: 0,
+};
+
+/** Per-powerup cap, keyed by mode. Only powerups a mode actually uses appear. */
+export const STANDARD_CAP: Partial<Powerups> = {
+  undo: 2,
+  swap: 2,
+  delete: 2,
+};
+
+export const PLUS_CAP: Partial<Powerups> = {
+  undo: 2,
+  swap: 2,
+  teleport: 2,
+  rotate: 2,
+  delete: 2,
+  bomb: 2,
+};
+
+/** Tile-value milestone -> powerup granted (+1, capped) for each mode. */
+export const STANDARD_UNLOCKS: [number, keyof Powerups][] = [
+  [128, "undo"],
+  [256, "swap"],
+  [512, "delete"],
+];
+
+export const PLUS_UNLOCKS: [number, keyof Powerups][] = [
+  [128, "undo"],
+  [256, "teleport"],
+  [256, "swap"],
+  [256, "rotate"],
+  [512, "delete"],
+  [512, "bomb"],
+];
+
+/** Undo keeps a short rolling window of prior board states. */
+export const MAX_HISTORY = 5;
 
 export const TILE_COLORS: Record<number, { bg: string; fg: string }> = {
   2: { bg: "var(--tile-2-bg)", fg: "var(--tile-2-fg)" },
@@ -46,6 +96,6 @@ export function tileColor(value: number): { bg: string; fg: string } {
   return TILE_COLORS[value] ?? SUPER_TILE;
 }
 
-export function gameKey(size: number, mode: string): string {
-  return `${size}:${mode}`;
+export function gameKey(mode: string): string {
+  return mode;
 }

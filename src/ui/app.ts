@@ -26,7 +26,7 @@ import { currentResolved, setThemePref, toggleTheme } from "./theme";
 import { Overlay } from "./overlay";
 import { animateModeBadge, bumpScore, setScore } from "./scores";
 
-type Armed = "none" | "swap" | "delete";
+type Armed = "none" | "swap" | "delete" | "teleport" | "bomb";
 
 export class App {
   private data: StoredData;
@@ -54,11 +54,14 @@ export class App {
 
   private scoreVal!: HTMLElement;
   private bestVal!: HTMLElement;
-  private powerupsRow!: HTMLElement;
+  private powerupsPanel!: HTMLElement;
   private undoBtn!: HTMLElement;
   private swapBtn!: HTMLElement;
   private deleteBtn!: HTMLElement;
-  private hintEl!: HTMLElement;
+  private teleportBtn!: HTMLElement;
+  private rotateLeftBtn!: HTMLElement;
+  private rotateRightBtn!: HTMLElement;
+  private bombBtn!: HTMLElement;
   private newGameBtn!: HTMLElement;
   private themeBtn!: HTMLElement;
   private modeBadge!: HTMLElement;
@@ -97,8 +100,6 @@ export class App {
       autoPowerups: this.data.settings.autoPowerups,
       rngManip: this.data.settings.rngManip,
       deterministic: this.data.settings.deterministic,
-      backtrackEnabled: this.data.settings.backtrackEnabled,
-      onBacktrack: (on) => this.onBacktrack(on),
       mode: this.mode,
       size: this.size,
       onTheme: (p) => this.onThemePref(p),
@@ -110,13 +111,7 @@ export class App {
       onDeterministic: (on) => this.onDeterministic(on),
       onMode: (m) => this.switchTo(this.size, m),
       onSize: (s) => this.switchTo(s, this.mode),
-      onClearAll: (isBacktrackPrompt?) => {
-        if (isBacktrackPrompt) {
-          this.showBacktrackDisableDialog();
-        } else {
-          this.confirmClearAll();
-        }
-      },
+      onClearAll: () => this.confirmClearAll(),
     });
 
     const logoBlock = document.createElement("div");
@@ -169,26 +164,39 @@ export class App {
     stage.className = "stage";
     this.board = new BoardRenderer(stage);
 
-    const hintEl = document.createElement("div");
-    hintEl.className = "hint";
-    hintEl.style.display = "none";
-    const hintText = document.createElement("span");
-    hintText.className = "hint__text";
-    const hintCancel = document.createElement("button");
-    hintCancel.type = "button";
-    hintCancel.className = "hint__cancel";
-    hintCancel.textContent = "cancel";
-    hintCancel.addEventListener("click", () => this.cancelPowerup());
-    hintEl.append(hintText, hintCancel);
-    this.hintEl = hintEl;
-
-    const powerups = document.createElement("div");
-    powerups.className = "powerups";
+    const powerupsPanel = document.createElement("div");
+    powerupsPanel.className = "powerups-panel";
     this.undoBtn = this.makePowerupBtn(Icons.undo, "Undo", "undo");
     this.swapBtn = this.makePowerupBtn(Icons.swap, "Swap", "swap");
     this.deleteBtn = this.makePowerupBtn(Icons.delete, "Delete", "delete");
-    powerups.append(this.undoBtn, this.swapBtn, this.deleteBtn);
-    this.powerupsRow = powerups;
+    this.teleportBtn = this.makePowerupBtn(
+      Icons.teleport,
+      "Teleport",
+      "teleport",
+    );
+    this.rotateLeftBtn = this.makePowerupBtn(
+      Icons.rotate,
+      "Rotate left",
+      "rotate-left",
+    );
+    this.rotateLeftBtn.classList.add("powerup-btn--rotate-left");
+    this.rotateRightBtn = this.makePowerupBtn(
+      Icons.rotate,
+      "Rotate right",
+      "rotate-right",
+    );
+    this.rotateRightBtn.classList.add("powerup-btn--rotate-right");
+    this.bombBtn = this.makePowerupBtn(Icons.bomb, "Bomb", "bomb");
+    powerupsPanel.append(
+      this.undoBtn,
+      this.swapBtn,
+      this.deleteBtn,
+      this.teleportBtn,
+      this.rotateLeftBtn,
+      this.rotateRightBtn,
+      this.bombBtn,
+    );
+    this.powerupsPanel = powerupsPanel;
 
     const gameOverBar = document.createElement("div");
     gameOverBar.className = "game-over-bar";
@@ -200,7 +208,7 @@ export class App {
     gameOverBar.append(goBtn);
     this.gameOverBar = gameOverBar;
 
-    stage.append(hintEl, powerups, gameOverBar);
+    stage.append(powerupsPanel, gameOverBar);
     shell.append(stage);
     app.append(topbar, shell);
 
@@ -235,7 +243,14 @@ export class App {
   private makePowerupBtn(
     icon: string,
     label: string,
-    kind: "undo" | "swap" | "delete",
+    kind:
+      | "undo"
+      | "swap"
+      | "delete"
+      | "teleport"
+      | "rotate-left"
+      | "rotate-right"
+      | "bomb",
   ): HTMLElement {
     const btn = document.createElement("button");
     btn.type = "button";
@@ -250,29 +265,42 @@ export class App {
     const count = document.createElement("span");
     count.className = "powerup-btn__count";
     count.textContent = "0";
-    btn.append(iconSpan, count, tooltip);
+    const cancel = document.createElement("span");
+    cancel.className = "powerup-btn__cancel";
+    cancel.setAttribute("aria-label", "Cancel");
+    cancel.innerHTML = Icons.close;
+    cancel.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.cancelPowerup();
+    });
+    btn.append(iconSpan, count, tooltip, cancel);
     btn.addEventListener("click", () => {
       if (kind === "undo") this.powerupUndo();
       else if (kind === "swap") this.powerupSwap();
-      else this.powerupDelete();
+      else if (kind === "delete") this.powerupDelete();
+      else if (kind === "teleport") this.powerupTeleport();
+      else if (kind === "rotate-left") this.powerupRotate("left");
+      else if (kind === "rotate-right") this.powerupRotate("right");
+      else this.powerupBomb();
     });
     btn.dataset.kind = kind;
     return btn;
   }
 
-  private loadGame(size: number, mode: GameMode): void {
-    this.size = size;
+  private loadGame(size: number, mode: GameMode, forceNew = false): void {
     this.mode = mode;
-    const saved = getGame(this.data, size, mode);
+    const saved = !forceNew ? getGame(this.data, mode) : undefined;
     let state: GameState;
     if (saved) {
       state = saved;
+      this.size = state.size;
       this.session = restoreSession(state);
     } else {
+      this.size = size;
       this.session = GameSession.newGame(
         size,
         mode,
-        0,
+        saved ? (saved as GameState).best : 0,
         undefined,
         this.data.settings.rngManip,
       );
@@ -282,7 +310,7 @@ export class App {
     this.session.setRngManipulation(this.data.settings.rngManip);
     this.session.setUsageMode(this.data.settings.usageMode);
     this.pendingNew = false;
-    this.board.setSize(size);
+    this.board.setSize(this.size);
     this.board.fullRender(this.session.state.grid, !saved);
     this.updateUI();
     this.wasOver = this.session.state.over;
@@ -290,15 +318,45 @@ export class App {
   }
 
   private switchTo(size: number, mode: GameMode): void {
-    if (size === this.size && mode === this.mode) return;
+    const sizeChanged = size !== this.size;
+    const modeChanged = mode !== this.mode;
+    if (!sizeChanged && !modeChanged) return;
     this.saveCurrent();
     this.overlay.close();
     this.cancelPowerup();
     this.data.settings.lastSize = size;
     this.data.settings.lastMode = mode;
     this.persist();
-    this.loadGame(size, mode);
-    this.popover.update({ size, mode });
+    // Changing board size always starts a fresh board at that size, since
+    // an in-progress grid can't be resized in place. Changing mode alone
+    // resumes that mode's saved game (or starts one) at its own size.
+    if (sizeChanged) {
+      const best = modeChanged
+        ? (getGame(this.data, mode)?.best ?? 0)
+        : this.session.state.best;
+      this.mode = mode;
+      this.session = GameSession.newGame(
+        size,
+        mode,
+        best,
+        undefined,
+        this.data.settings.rngManip,
+      );
+      this.size = size;
+      putGame(this.data, this.session.state);
+      this.persist();
+      this.session.setRngManipulation(this.data.settings.rngManip);
+      this.session.setUsageMode(this.data.settings.usageMode);
+      this.pendingNew = false;
+      this.board.setSize(size);
+      this.board.fullRender(this.session.state.grid, true);
+      this.updateUI();
+      this.wasOver = this.session.state.over;
+      this.handleWinOver();
+    } else {
+      this.loadGame(size, mode);
+    }
+    this.popover.update({ size: this.size, mode });
   }
 
   private doMove(dir: Direction): void {
@@ -354,7 +412,7 @@ export class App {
 
   private resumeGame(): void {
     if (!this.pendingNew) return;
-    const saved = getGame(this.data, this.size, this.mode);
+    const saved = getGame(this.data, this.mode);
     if (!saved || saved.over || saved.moveCount === 0) {
       this.pendingNew = false;
       this.updatePrimaryButton();
@@ -413,14 +471,99 @@ export class App {
     this.clearPendingNew();
     this.armed = "delete";
     this.board.enterSelectMode(1, (cells) => {
-      if (cells.length === 1) {
-        this.session.deleteTile(cells[0].row, cells[0].col);
-        this.saveCurrent();
-        this.board.fullRender(this.session.state.grid);
+      const [cell] = cells;
+      if (cell) {
+        const value = this.session.state.grid[cell.row][cell.col]?.value;
+        if (value !== undefined) {
+          const ids = this.session.state.grid
+            .flat()
+            .filter((c) => c?.value === value)
+            .map((c) => c!.id);
+          if (this.session.deleteByValue(value) > 0) {
+            this.saveCurrent();
+            this.board.animateClear(ids);
+          }
+        }
       }
       this.armed = "none";
       this.updateUI();
     });
+    this.updateUI();
+  }
+
+  private powerupTeleport(): void {
+    if (!this.session.canTeleport || this.board.isSelecting) {
+      if (this.board.isSelecting) this.cancelPowerup();
+      return;
+    }
+    this.stopAuto();
+    this.clearPendingNew();
+    this.armed = "teleport";
+    this.board.enterSelectMode(
+      2,
+      (cells) => {
+        if (cells.length === 2) {
+          const [from, to] = cells;
+          if (this.session.teleport(from.row, from.col, to.row, to.col)) {
+            this.saveCurrent();
+            this.board.animateTeleport(from.id, to.row, to.col);
+          }
+        }
+        this.armed = "none";
+        this.updateUI();
+      },
+      true,
+    );
+    this.updateUI();
+  }
+
+  private powerupRotate(direction: "left" | "right"): void {
+    if (!this.session.canRotate || this.board.isSelecting) return;
+    this.stopAuto();
+    this.clearPendingNew();
+    const n = this.size;
+    const ring: { row: number; col: number }[] = [];
+    for (let c = 0; c < n; c++) ring.push({ row: 0, col: c });
+    for (let r = 1; r < n; r++) ring.push({ row: r, col: n - 1 });
+    for (let c = n - 2; c >= 0; c--) ring.push({ row: n - 1, col: c });
+    for (let r = n - 2; r >= 1; r--) ring.push({ row: r, col: 0 });
+    const grid = this.session.state.grid;
+    const before = ring.map((p) => grid[p.row][p.col]);
+
+    if (!this.session.rotateRing(direction)) return;
+    this.saveCurrent();
+
+    const shift = direction === "right" ? 1 : -1;
+    const moves: { id: number; row: number; col: number }[] = [];
+    ring.forEach((p, i) => {
+      const from = before[(i - shift + before.length) % before.length];
+      if (from) moves.push({ id: from.id, row: p.row, col: p.col });
+    });
+    this.board.animateRingShift(moves);
+    this.updateUI();
+  }
+
+  private powerupBomb(): void {
+    if (!this.session.canBomb || this.board.isSelecting) {
+      if (this.board.isSelecting) this.cancelPowerup();
+      return;
+    }
+    this.stopAuto();
+    this.clearPendingNew();
+    this.armed = "bomb";
+    this.board.enterSelectMode(
+      1,
+      (cells) => {
+        const [center] = cells;
+        if (center && this.session.bomb(center.row, center.col)) {
+          this.saveCurrent();
+          this.board.fullRender(this.session.state.grid);
+        }
+        this.armed = "none";
+        this.updateUI();
+      },
+      true,
+    );
     this.updateUI();
   }
 
@@ -461,32 +604,46 @@ export class App {
 
     this.updatePrimaryButton();
 
-    const isStandard = this.mode === "standard";
-    this.powerupsRow.style.display = isStandard ? "" : "none";
+    const showPowerups = this.mode !== "classic";
+    this.powerupsPanel.classList.toggle("is-visible", showPowerups);
+    this.board.el.classList.toggle("board--plus", this.mode === "plus");
 
     this.setFrozen(s.over);
 
-    const setPower = (btn: HTMLElement, count: number, enabled: boolean) => {
+    const setPower = (
+      btn: HTMLElement,
+      count: number,
+      enabled: boolean,
+      armedKind: Armed | null = null,
+    ) => {
       btn.querySelector(".powerup-btn__count")!.textContent = String(count);
       (btn as HTMLButtonElement).disabled = !enabled;
-      btn.classList.toggle("animate-throb", enabled && count > 0);
+      if (armedKind) btn.classList.toggle("is-armed", this.armed === armedKind);
     };
     setPower(this.undoBtn, s.powerups.undo, this.session.canUndo);
-    setPower(this.swapBtn, s.powerups.swap, this.session.canSwap);
-    setPower(this.deleteBtn, s.powerups.delete, this.session.canDelete);
+    setPower(this.swapBtn, s.powerups.swap, this.session.canSwap, "swap");
+    setPower(
+      this.deleteBtn,
+      s.powerups.delete,
+      this.session.canDelete,
+      "delete",
+    );
 
-    this.swapBtn.classList.toggle("is-armed", this.armed === "swap");
-    this.deleteBtn.classList.toggle("is-armed", this.armed === "delete");
-
-    if (this.armed === "none") {
-      this.hintEl.style.display = "none";
-    } else {
-      this.hintEl.style.display = "";
-      const text = this.hintEl.querySelector(".hint__text")!;
-      text.textContent =
-        this.armed === "swap"
-          ? "Select two tiles to swap."
-          : "Select a tile to delete.";
+    const isPlus = this.mode === "plus";
+    this.teleportBtn.style.display = isPlus ? "" : "none";
+    this.rotateLeftBtn.style.display = isPlus ? "" : "none";
+    this.rotateRightBtn.style.display = isPlus ? "" : "none";
+    this.bombBtn.style.display = isPlus ? "" : "none";
+    if (isPlus) {
+      setPower(
+        this.teleportBtn,
+        s.powerups.teleport,
+        this.session.canTeleport,
+        "teleport",
+      );
+      setPower(this.rotateLeftBtn, s.powerups.rotate, this.session.canRotate);
+      setPower(this.rotateRightBtn, s.powerups.rotate, this.session.canRotate);
+      setPower(this.bombBtn, s.powerups.bomb, this.session.canBomb, "bomb");
     }
   }
 
@@ -549,49 +706,6 @@ export class App {
   private setFrozen(frozen: boolean): void {
     this.board.el.classList.toggle("is-disabled", frozen);
     this.gameOverBar.classList.toggle("is-visible", frozen);
-  }
-
-  private showBacktrackDisableDialog(): void {
-    const hasData = (this.session.state.deltaHistory?.length ?? 0) > 0;
-    this.overlay.show({
-      title: "Disable backtrack?",
-      danger: true,
-      message: hasData
-        ? "You have backtrack data stored. Do you want to keep it or clear it?"
-        : "Backtrack data will be cleared.",
-      actions: [
-        { label: "Cancel", onClick: () => this.overlay.close() },
-        ...(hasData
-          ? [
-              {
-                label: "Keep & Disable",
-                onClick: () => this.disableBacktrack(false),
-              },
-              {
-                label: "Clear & Disable",
-                primary: true,
-                onClick: () => this.disableBacktrack(true),
-              },
-            ]
-          : [
-              {
-                label: "Disable",
-                primary: true,
-                onClick: () => this.disableBacktrack(false),
-              },
-            ]),
-      ],
-    });
-  }
-
-  private disableBacktrack(clearCache: boolean): void {
-    if (clearCache && this.session.state.deltaHistory) {
-      this.session.state.deltaHistory.length = 0;
-    }
-    this.data.settings.backtrackEnabled = false;
-    this.persist();
-    this.popover.update({ backtrackEnabled: false });
-    this.overlay.close();
   }
 
   private confirmClearAll(): void {
@@ -673,12 +787,6 @@ export class App {
         : "Deterministic Algorithm disabled",
       Icons.dice,
     );
-  }
-
-  private onBacktrack(on: boolean): void {
-    this.data.settings.backtrackEnabled = on;
-    this.persist();
-    this.popover.update({ backtrackEnabled: on });
   }
 
   private onThemeToggle(): void {
