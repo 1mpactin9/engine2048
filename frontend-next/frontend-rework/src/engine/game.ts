@@ -467,17 +467,13 @@ export class GameEngine {
       }
 
     const removes: string[] = []
-    let survivorsInZone = 0
     for (const c of zone) {
       const t = this.state.board[c.y][c.x]
       if (t) {
         removes.push(t.id)
         this.state.board[c.y][c.x] = null
-      } else {
-        survivorsInZone++
       }
     }
-    void survivorsInZone
 
     this.consumePowerup('bomb')
 
