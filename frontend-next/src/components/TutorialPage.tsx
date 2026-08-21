@@ -31,7 +31,7 @@ function empty(): NumBoard {
   return Array.from({ length: 4 }, () => Array.from({ length: 4 }, () => null))
 }
 
-function place(rows: number[][]): NumBoard {
+function place(rows: (number | null)[][]): NumBoard {
   const b = empty()
   rows.forEach((row, y) => row.forEach((v, x) => (b[y][x] = v)))
   return b
@@ -175,7 +175,7 @@ export function TutorialPage() {
       if (s >= 4) return
       const res = slideValues(boardRef.current, dir)
       if (!res.changed) return
-      await rendererRef.current?.animateMove(res)
+      await rendererRef.current?.animateMove({ slides: res.slides, merges: res.merges, spawn: null })
       boardRef.current = res.board
       renderBoard(res.board)
 
