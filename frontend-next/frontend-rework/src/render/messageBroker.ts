@@ -33,19 +33,41 @@ interface ListenMsg {
 }
 export type BrokerMessage = CallMsg | ResponseMsg | EventMsg | ListenMsg
 
+/** Gather ImageBitmap / OffscreenCanvas args so they transfer without detaching on the sending side. */
+function collectTransferables(message: BrokerMessage): Transferable[] {
+  const out: Transferable[] = []
+  const visit = (v: unknown) => {
+    if (v === null || typeof v !== 'object') return
+    if (v instanceof ImageBitmap || (typeof OffscreenCanvas !== 'undefined' && v instanceof OffscreenCanvas)) {
+      out.push(v as Transferable)
+      return
+    }
+    if (Array.isArray(v)) {
+      for (const item of v) visit(item)
+    } else {
+      for (const item of Object.values(v as Record<string, unknown>)) visit(item)
+    }
+  }
+  if (message.kind === 'call') visit(message.args)
+  return out
+}
+
 export class MessageBroker {
+  private port: BrokerPort
   private nextId = 1
   private pending = new Map<number, { resolve: (v: unknown) => void; reject: (e: Error) => void }>()
   private listeners = new Map<string, Set<(...args: unknown[]) => void>>()
   /** Registered on the receiving side; call() dispatches into these. */
-  private methods = new Map<string, (...args: unknown[]) => unknown>()
+  private methods = new Map<string, (...args: any[]) => unknown>()
 
-  constructor(private port: BrokerPort) {
+  constructor(port: BrokerPort) {
+    this.port = port
     port.addEventListener('message', (ev: MessageEvent) => this.handle(ev.data as BrokerMessage))
   }
 
   private send(message: BrokerMessage, transfer?: Transferable[]) {
-    this.port.postMessage(message, transfer)
+    const auto = collectTransferables(message)
+    this.port.postMessage(message, transfer ?? (auto.length ? auto : undefined))
   }
 
   private handle(msg: BrokerMessage) {
@@ -99,7 +121,7 @@ export class MessageBroker {
   }
 
   /** Expose a method to the peer. */
-  expose(method: string, fn: (...args: unknown[]) => unknown) {
+  expose(method: string, fn: (...args: any[]) => unknown) {
     this.methods.set(method, fn)
   }
 

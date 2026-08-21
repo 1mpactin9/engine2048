@@ -8,7 +8,7 @@ import { Application, Container, Graphics, ImageSource, Rectangle, Sprite, Textu
 import type { MergeEvent, SlideEvent, Tile } from '@/engine/types'
 import { BOARD_SIZE, STRIDE, TILE_GROUP_OFFSET, cellCenter } from './geometry'
 import { Spring, STANDARD_SPRING } from './springs'
-import type { BoardTheme, GlyphMetrics, TexturePack } from './textures'
+import type { BoardTheme, TexturePack } from './textures'
 import { tileTextColor } from './textures'
 
 export type RingVisualState = 'idle' | 'valid' | 'invalid' | 'selected'
@@ -54,7 +54,6 @@ export class BoardStage {
   private tiles = new Map<string, TileView>()
 
   private pack!: TexturePack
-  private theme!: BoardTheme
   private tileTextures = new Map<number, Texture>()
   private glyphSource!: ImageSource
 
@@ -82,7 +81,6 @@ export class BoardStage {
     opts: { pack: TexturePack; theme: BoardTheme; cssWidth: number; cssHeight: number; resolution: number },
   ) {
     this.pack = opts.pack
-    this.theme = opts.theme
     this.buildTextures()
 
     const preferences: ('webgpu' | 'webgl')[] = ['webgpu', 'webgl']
@@ -252,8 +250,6 @@ export class BoardStage {
 
   /** Slide + merge + spawn; resolves when the 250ms window completes. */
   animateMove(events: { slides: SlideEvent[]; merges: MergeEvent[]; spawn: Tile | null }): Promise<void> {
-    const started = performance.now()
-
     for (const slide of events.slides) {
       const view = this.tiles.get(slide.tileId)
       if (!view) continue

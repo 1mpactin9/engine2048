@@ -12,7 +12,6 @@ import type {
   MergeEvent,
   Mode,
   PowerupId,
-  PowerupInventory,
   SlideEvent,
   Tile,
 } from './types'
@@ -424,7 +423,6 @@ export class GameEngine {
 
   applyRotate(clockwise: boolean): PowerupEvents | null {
     if (this.state.state !== 'selecting' || this.selectingPowerup !== 'rotate') return null
-    const ringIdx = (x: number, y: number) => RING_CELLS.findIndex((c) => c.x === x && c.y === y)
     const slides: SlideEvent[] = []
     const moves: { tile: Tile; from: number; to: number }[] = []
     for (let i = 0; i < 12; i++) {

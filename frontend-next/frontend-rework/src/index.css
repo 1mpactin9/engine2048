@@ -205,6 +205,26 @@
   animation: throb 1000ms infinite;
 }
 
+/* Floating rotation arrows (§19.3 / §37): y 0 -> -5px, 2000ms mirror, 500ms delay. */
+@keyframes float-y {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(-5px);
+  }
+}
+
+@utility animate-float-y {
+  animation: float-y 2000ms ease-in-out 500ms infinite alternate;
+}
+
+.header-grid {
+  grid-template-columns: [left] 1fr [center] min-content [right] 1fr;
+  grid-template-rows: [first] min-content;
+  gap: 6px 4px;
+}
+
 /* ---------- Base ---------- */
 
 html,

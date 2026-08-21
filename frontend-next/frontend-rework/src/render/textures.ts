@@ -170,6 +170,12 @@ function ringSvg(): string {
 
 // ---------- Rasterization ----------
 
+type TransferableCanvas = HTMLCanvasElement & { transferToImageBitmap(): ImageBitmap }
+
+function canvasToBitmap(canvas: HTMLCanvasElement): ImageBitmap {
+  return (canvas as TransferableCanvas).transferToImageBitmap()
+}
+
 export function svgToImageBitmap(svg: string, width: number, height: number, resolution: number): Promise<ImageBitmap> {
   return new Promise((resolve, reject) => {
     const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' })
@@ -182,7 +188,7 @@ export function svgToImageBitmap(svg: string, width: number, height: number, res
       const ctx = canvas.getContext('2d')!
       ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
       URL.revokeObjectURL(url)
-      resolve(canvas.transferToImageBitmap())
+      resolve(canvasToBitmap(canvas))
     }
     img.onerror = () => {
       URL.revokeObjectURL(url)
@@ -283,7 +289,7 @@ async function buildGlyphAtlas(): Promise<{ bitmap: ImageBitmap; metrics: GlyphM
     // Placement: pen origin sits at (buffer, middle) inside the tiny-sdf canvas.
     cells.push({
       char: ch,
-      img: c.transferToImageBitmap(),
+      img: canvasToBitmap(c),
       left: buffer - abbl,
       top: sdf.middle,
       advance,
@@ -313,7 +319,7 @@ async function buildGlyphAtlas(): Promise<{ bitmap: ImageBitmap; metrics: GlyphM
     }
   })
   return {
-    bitmap: canvas.transferToImageBitmap(),
+    bitmap: canvasToBitmap(canvas),
     metrics: { chars, entries, atlasWidth, atlasHeight, fontSize },
   }
 }

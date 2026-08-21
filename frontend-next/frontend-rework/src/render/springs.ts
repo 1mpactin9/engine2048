@@ -33,15 +33,19 @@ export class Spring {
   private value: number
   private velocity: number
   private elapsed: number
+  private to: number
+  private readonly config: SpringConfig
 
   constructor(
-    private from: number,
-    private to: number,
-    private config: SpringConfig,
+    from: number,
+    to: number,
+    config: SpringConfig,
     /** Negative offset starts the spring before "now" (§19.5). */
     elapsed = 0,
     initialVelocity?: number,
   ) {
+    this.to = to
+    this.config = config
     this.value = from
     this.velocity = initialVelocity ?? config.velocity ?? 0
     this.elapsed = elapsed
@@ -77,7 +81,6 @@ export class Spring {
   }
 
   retarget(to: number) {
-    this.from = this.value
     this.to = to
     this.elapsed = 0
   }

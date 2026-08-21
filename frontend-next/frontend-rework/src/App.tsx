@@ -1,122 +1,49 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { useEffect, useMemo, useState } from 'react'
+import { useRoute } from './router'
+import { ThemeContext, loadMidnightTheme, resolveTheme, saveMidnightTheme } from './theme'
+import { GamePage } from './components/GamePage'
+import { TutorialPage } from './components/TutorialPage'
+import { StaticPage } from './components/StaticPage'
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.tsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+function modeForRoute(route: ReturnType<typeof useRoute>): 'standard' | 'classic' | 'plus' {
+  if (route === '/classic') return 'classic'
+  if (route === '/plus') return 'plus'
+  return 'standard'
 }
 
-export default App
+export default function App() {
+  const route = useRoute()
+  const [midnight, setMidnight] = useState(() => loadMidnightTheme())
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = midnight ? 'midnight' : route === '/plus' ? 'plus' : 'light'
+  }, [midnight, route])
+
+  const uiTheme = resolveTheme(modeForRoute(route), midnight)
+  const themeValue = useMemo(
+    () => ({
+      midnight,
+      uiTheme,
+      boardTheme: uiTheme as 'light' | 'plus' | 'midnight',
+      setMidnight: (on: boolean) => {
+        setMidnight(on)
+        saveMidnightTheme(on)
+      },
+    }),
+    [midnight, uiTheme],
+  )
+
+  return (
+    <ThemeContext.Provider value={themeValue}>
+      <div className="flex min-h-[100svh] w-screen touch-none flex-col overflow-x-hidden">
+        {route === '/tutorial' ? (
+          <TutorialPage />
+        ) : route === '/about' || route === '/privacy-policy' || route === '/troubleshooting' ? (
+          <StaticPage route={route} />
+        ) : (
+          <GamePage mode={modeForRoute(route)} />
+        )}
+      </div>
+    </ThemeContext.Provider>
+  )
+}
