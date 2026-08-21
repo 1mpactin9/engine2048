@@ -1,68 +1,39 @@
 <div align="center">
   <h1>2048 Engine</h1>
 
+<!--
   <p>
-    <a href="#prerequisites">Prerequisites</a> • 
-    <a href="#build">Installation</a> • 
-    <a href="#quick-access">Documentation</a>
+    <a href="#"></a> • 
+    <a href="#"></a> • 
+    <a href="#"></a>
   </p>
+-->
 
+<!--
   <a href="LICENSE"><img src="https://img.shields.io/github/license/1mpactin9/engine2048" alt="License"></a>
   <a href="https://github.com/1mpactin9/engine2048/actions"><img src="https://img.shields.io/github/actions/workflow/status/1mpactin9/engine2048/ci.yml" alt="Actions"></a>
+-->
+
 </div>
-
-A 2048 game built with TypeScript, Vite, and a Rust/WASM game engine. Still in progress, but works!
-
-## Prerequisites
-
-| Tool | Why | Minimum version |
-|------|-----|-----------------|
-| [Node.js](https://nodejs.org) | package manager | 18+ |
-| [Rust + Cargo](https://rustup.rs) | game engine | Latest stable |
-| [wasm-pack](https://rustwasm.github.io/wasm-pack/) | rust and webAssembly | latest |
-
-Install Rust + Cargo first, then:
-
-```bash
-cargo install wasm-pack
-```
 
 ## Build
 
 ```bash
-npm install         # dependencies
-npm run build       # run build
-npm run dev         # start dev
+pnpm install         # dependencies
+pnpm run build       # run build
+pnpm run dev         # start dev
 ```
 
 ## Verification
 
 ```bash
 # run test suite
-npm test
+pnpm test
 
 # build and preview
-npm run build
-npm run preview
+pnpm run build
+pnpm run preview
 ```
-
-## Reference
-
-| Script | Description |
-|--------|-------------|
-| `npm run dev` | start dev server |
-| `npm run build` | WASM + type-check + build |
-| `npm run build:wasm` | compile the Rust engine to WASM only |
-| `npm run preview` | preview the production `dist/` bundle locally |
-| `npm test` | run Vitest test suite (node environment) |
-| `npm run test:watch` | run Vitest in watch mode |
-
-## Quick Access
-
-| Document | Description |
-|--------|-------------|
-| [Benchmark Result](docs/benchmark.md) | some example benchmark results |
-| [Developer Documentation](docs/dev.md) | throuogh project overview |
 
 ## License
 
