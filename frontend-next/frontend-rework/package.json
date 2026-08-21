@@ -12,7 +12,8 @@
   "dependencies": {
     "pixi.js": "8.11.0",
     "react": "^19.2.8",
-    "react-dom": "^19.2.8"
+    "react-dom": "^19.2.8",
+    "tiny-sdf": "^1.0.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
