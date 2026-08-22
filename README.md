@@ -52,6 +52,7 @@ This project interacts with the following external open-source tools:
 - [gabrielecirulli/2048](https://github.com/gabrielecirulli/2048) - Licensed under MIT
 - [nneonneo/2048-ai](https://github.com/nneonneo/2048-ai) - Licensed under MIT
 - [ziap/2048-ai](https://github.com/ziap/2048-ai) - Licensed under MIT
+- [davidbau/seedrandom](https://github.com/davidbau/seedrandom) - Licensed under MIT
 
 &nbsp;
 

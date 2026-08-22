@@ -27,6 +27,7 @@ Operating agreement for `engine2048`. Defines folder scope, code standards, and 
 
 ### `frontend/` (Preact + Vite + Tailwind + Pixi.js, zustand, wouter)
 - `src/api/` — backend communication, no UI logic.
+- `src/game/` — client-side game engine: board, moves, merging, scoring, seeded RNG. No rendering.
 - `src/canvas/` — Pixi.js rendering, reads state only.
 - `src/components/` / `src/pages/` — presentational components and route views.
 - `src/stores/` — zustand state, no rendering.
@@ -102,7 +103,7 @@ fix: resolve null pointer in database connector
 
 ### 3.4 Dependency protocol
 - Use pnpm for all dependency management; commit lockfile changes.
-- Add a dependency only when necessary; prefer the smallest change that satisfies the requirement.
+- Add a dependency only when necessary; prefer the smallest change that satisfies the requirement. (user prompt may overwrite this)
 - New dependencies must be license-compatible with GPL-3.0; record in `NOTICE.md` and README credits.
 
 ### 3.5 Documentation protocol

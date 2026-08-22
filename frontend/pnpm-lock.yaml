@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@types/seedrandom':
+        specifier: ^3.0.8
+        version: 3.0.8
       pixi.js:
         specifier: ^8.19.0
         version: 8.19.0
@@ -17,6 +20,9 @@ importers:
       preact:
         specifier: ^10.29.7
         version: 10.29.8
+      seedrandom:
+        specifier: ^3.0.5
+        version: 3.0.5
       wouter:
         specifier: ^3.10.0
         version: 3.10.0(react@19.2.8)
@@ -398,6 +404,9 @@ packages:
   '@types/node@24.13.3':
     resolution: {integrity: sha512-Dh8vAsV36ig5wa9OX4pXvMc9D3Veibfw2wix0CUwYODLD8nkj9UsLjASr49nPg+2eKzxhBV+v7L8pXvT4e639Q==}
 
+  '@types/seedrandom@3.0.8':
+    resolution: {integrity: sha512-TY1eezMU2zH2ozQoAFAQFOPpvP15g+ZgSfTZt31AUUH/Rxtnz3H+A/Sv1Snw2/amp//omibc+AEkTaA8KUeOLQ==}
+
   '@webgpu/types@0.1.72':
     resolution: {integrity: sha512-0cF7RFM2edNoiIS1ODJp0/Gzv4/xSXhwoR0YCza+OWpJWtn4wmo9DvK91aLlH9+uUnwIriP7ZiC3WitmyhuzBw==}
 
@@ -765,6 +774,9 @@ packages:
     resolution: {integrity: sha512-VD2IE5PUG4Oj8zz2VGykiYd5wbnjdIiSsNQb8Qu5B+noEp+A78mu2iVvpp27g8es14Tk9rofNs5Tku9iQCS4fA==}
     engines: {node: ^20.19.0 || >=22.12.0}
     hasBin: true
+
+  seedrandom@3.0.5:
+    resolution: {integrity: sha512-8OwmbklUNzwezjGInmZ+2clQmExQPvomqjL7LFqOYqtmuxRgQYqOD3mHaU+MvZn5FLUeVxVfQjwLZW/n/JFuqg==}
 
   semver@6.3.1:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
@@ -1229,6 +1241,8 @@ snapshots:
     dependencies:
       undici-types: 7.18.2
 
+  '@types/seedrandom@3.0.8': {}
+
   '@webgpu/types@0.1.72': {}
 
   '@xmldom/xmldom@0.8.14': {}
@@ -1524,6 +1538,8 @@ snapshots:
       '@rolldown/binding-openharmony-arm64': 1.2.5
       '@rolldown/binding-win32-arm64-msvc': 1.2.5
       '@rolldown/binding-win32-x64-msvc': 1.2.5
+
+  seedrandom@3.0.5: {}
 
   semver@6.3.1: {}
 

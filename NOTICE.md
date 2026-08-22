@@ -20,6 +20,10 @@ This software interacts with third-party components. The original licenses and c
 - **License:** [MIT License](https://opensource.org/license/mit)
 - **Source:** [GitHub Repository](https://github.com/ziap/2048-ai)
 
+### 5. davidbau/seedrandom
+- **License:** [MIT License](https://opensource.org/license/mit)
+- **Source:** [GitHub Repository](https://github.com/davidbau/seedrandom)
+
 ---
 
 > _If you are a *rights holder* and believe that any content in this repository infringes upon your copyright, trademark, or intellectual property rights, please contact the repository maintainer directly._
