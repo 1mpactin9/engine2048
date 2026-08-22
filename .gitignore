@@ -20,13 +20,17 @@ vendor/
 .pnp.js
 
 # Build
-dist/
-build/
-out/
+*.crate
+*.log*.tmp
+**/*.rs.bk
+.cargo/config.toml
+.cargo/credentials.toml
+/target/
 bin/
+build/
+dist/
 obj/
-*.log
-*.tmp
+out/
 
 # Variables
 .env*

@@ -16,6 +16,7 @@
 
 </div>
 
+<!--
 ## Build
 
 ```bash
@@ -34,6 +35,9 @@ pnpm test
 pnpm run build
 pnpm run preview
 ```
+-->
+
+Agents read AGENT.md
 
 ## License
 
