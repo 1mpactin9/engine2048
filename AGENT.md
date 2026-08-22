@@ -12,29 +12,6 @@ Operating agreement for `engine2048`. Defines folder scope, code standards, and 
 - `frontend/` — Browser UI, rendering, client state, routing. No server logic or engine strategy.
 - `reference/` — read-only vendored third-party code (gitignored). Consult only — no project code, nothing modified or built.
 
-### Root files
-- `AGENT.md` — this file. Keep in sync with any layout/protocol change.
-- `README.md` — public-facing description, build/verification instructions.
-- `LICENSE` — GPL-3.0. Never change without owner's explicit approval.
-- `NOTICE.md` — third-party notices. Never change without owner's explicit approval.
-- `package.json` / `pnpm-lock.yaml` — root workspace metadata. Package manager: pnpm.
-
-### `backend/` (Node.js + TypeScript strict, Express 5, `ws`)
-- `src/engine/` — the AI: search/decision (expectimax, MCTS), heuristics, simulation, rollouts. Pure and deterministic; no I/O; only reads `game` state.
-- `src/game/` — the game itself: board, moves, state, rules. Source of truth for game logic; no AI/strategy.
-- `src/server/` — thin transport (routes, sockets, middleware) calling into `game`/`engine`.
-- Dependency direction: `server → engine/game → (nothing external)`.
-
-### `frontend/` (Preact + Vite + Tailwind + Pixi.js, zustand, wouter)
-- `src/api/` — backend communication, no UI logic.
-- `src/game/` — client-side game engine: board, moves, merging, scoring, seeded RNG. No rendering.
-- `src/canvas/` — Pixi.js rendering, reads state only.
-- `src/components/` / `src/pages/` — presentational components and route views.
-- `src/stores/` — zustand state, no rendering.
-- `src/assets/` vs `public/` — `assets/` for code-imported files, `public/` for as-is static files (never imported in code).
-
-### `reference/` (vendored third-party code, read-only, gitignored, excluded from builds)
-
 ### Rules:
 - Never modify, build, or commit anything under `reference/` — read/study only.
 - If code from a reference is adapted into `backend/` or `frontend/`: preserve the source's license requirements, update `NOTICE.md` and README credits.
@@ -103,7 +80,7 @@ fix: resolve null pointer in database connector
 
 ### 3.4 Dependency protocol
 - Use pnpm for all dependency management; commit lockfile changes.
-- Add a dependency only when necessary; prefer the smallest change that satisfies the requirement. (user prompt may overwrite this)
+- Add a dependency only when necessary; prefer the smallest change that satisfies the requirement.
 - New dependencies must be license-compatible with GPL-3.0; record in `NOTICE.md` and README credits.
 
 ### 3.5 Documentation protocol
