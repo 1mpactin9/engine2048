@@ -1,5 +1,6 @@
 {
   "name": "engine2048-monorepo",
+  "version": "0.0.0-alpha.0",
   "private": true,
   "scripts": {
     "dev": "pnpm --filter frontend dev",
